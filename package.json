@@ -1,0 +1,16 @@
+{
+  "name": "vscode-pr-reviewer-stage1",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Stage 1 delivery: PR -> Jira -> Score -> Draft pipeline",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --test --loader ts-node/esm tests/**/*.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.3"
+  }
+}
