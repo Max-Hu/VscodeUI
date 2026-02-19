@@ -56,10 +56,11 @@ test("Stage1ReviewOrchestrator runs PR -> Jira -> Confluence -> Score -> Draft p
 
   const result = await orchestrator.run({
     prLink: "https://github.com/acme/platform/pull/42",
-    reviewProfile: "default"
+    reviewProfile: "security"
   });
 
   assert.equal(result.context.prReference.owner, "acme");
+  assert.equal(result.context.profile, "default");
   assert.equal(result.context.jira.issues.length, 2);
   assert.ok(result.context.confluence.pages.length > 0);
   assert.ok(result.context.traceability.jiraToConfluence["PROJ-123"].length > 0);

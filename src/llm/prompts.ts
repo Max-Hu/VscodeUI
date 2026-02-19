@@ -24,6 +24,7 @@ const TEMPLATE_DIR_ENV = "PR_REVIEWER_PROMPT_TEMPLATE_DIR";
 const FALLBACK_SCORE_TEMPLATE = [
   "You are a strict PR reviewer.",
   "Use only the supplied PR/Jira/Confluence context.",
+  "Always evaluate Security, Performance, and Compliance concerns in every review.",
   "Return JSON only. No markdown.",
   "JSON schema:",
   "{{output_schema}}",
@@ -35,6 +36,7 @@ const FALLBACK_SCORE_TEMPLATE = [
 const FALLBACK_DRAFT_TEMPLATE = [
   "Generate a PR review markdown draft for human editing.",
   "Use concise sections: Summary, Score Breakdown, Jira/Confluence Traceability, Risks, Suggested Actions.",
+  "Always include Security, Performance, and Compliance observations when relevant evidence exists.",
   "Output JSON only: {{output_schema}}.",
   "Context:",
   "{{context_json}}"
@@ -49,6 +51,7 @@ export function buildScorePrompt(input: ScorePromptInput): string {
 
   const contextPayload = {
     profile: input.profile,
+    mandatoryFocus: ["Security", "Performance", "Compliance"],
     pr: {
       title: input.githubContext.metadata.title,
       body: input.githubContext.metadata.body,
@@ -84,6 +87,7 @@ export function buildDraftPrompt(input: DraftPromptInput): string {
   const contextPayload = {
     pr: input.reviewContext.github.metadata.url,
     profile: input.reviewContext.profile,
+    mandatoryFocus: ["Security", "Performance", "Compliance"],
     overallScore: input.score.overallScore,
     confidence: input.score.confidence,
     scoreBreakdown: input.score.scoreBreakdown,

@@ -35,6 +35,7 @@ test("buildScorePrompt renders template placeholders", () => {
   });
 
   assert.match(prompt, /Scoring profile: default/);
+  assert.match(prompt, /Mandatory focus areas: Security, Performance, Compliance/);
   assert.match(prompt, /overallScore/);
   assert.ok(!prompt.includes("{{"));
 });
@@ -84,6 +85,7 @@ test("buildDraftPrompt renders template placeholders", () => {
   });
 
   assert.match(prompt, /Review profile: default/);
+  assert.match(prompt, /Mandatory focus areas: Security, Performance, Compliance/);
   assert.match(prompt, /"markdown"/);
   assert.ok(!prompt.includes("{{"));
 });

@@ -4,8 +4,6 @@ export interface StartReviewMessage {
   type: "start-review";
   payload: {
     prLink: string;
-    reviewProfile?: "default" | "security" | "performance" | "compliance";
-    additionalKeywords?: string[];
   };
 }
 

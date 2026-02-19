@@ -1,13 +1,10 @@
 import type {
   PublishCommentRequest,
   PublishCommentResult,
-  ReviewProfile,
   ReviewRequest,
   Stage3ReviewResult
 } from "../domain/types.js";
 import type { PanelInboundMessage, PanelOutboundMessage } from "../views/panelContracts.js";
-
-const REVIEW_PROFILES: ReviewProfile[] = ["default", "security", "performance", "compliance"];
 
 export interface PanelMessageRouterDeps {
   runReview(request: ReviewRequest): Promise<Stage3ReviewResult>;
@@ -56,13 +53,8 @@ function toReviewRequest(message: Extract<PanelInboundMessage, { type: "start-re
     throw new Error("PR link is required.");
   }
 
-  const reviewProfile = asReviewProfile(message.payload?.reviewProfile);
-  const additionalKeywords = asKeywords(message.payload?.additionalKeywords);
-
   return {
-    prLink,
-    ...(reviewProfile ? { reviewProfile } : {}),
-    ...(additionalKeywords ? { additionalKeywords } : {})
+    prLink
   };
 }
 
@@ -82,23 +74,6 @@ function toPublishRequest(message: Extract<PanelInboundMessage, { type: "publish
     commentBody,
     confirmed: Boolean(message.payload?.confirmed)
   };
-}
-
-function asReviewProfile(value: unknown): ReviewProfile | undefined {
-  if (typeof value !== "string") {
-    return undefined;
-  }
-  return REVIEW_PROFILES.includes(value as ReviewProfile) ? (value as ReviewProfile) : undefined;
-}
-
-function asKeywords(value: unknown): string[] | undefined {
-  if (!Array.isArray(value)) {
-    return undefined;
-  }
-  const keywords = value
-    .map((item) => (typeof item === "string" ? item.trim() : ""))
-    .filter((item) => item.length > 0);
-  return keywords.length ? keywords : undefined;
 }
 
 function asNonEmptyString(value: unknown): string | undefined {

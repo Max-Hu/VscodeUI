@@ -4,6 +4,7 @@ Return JSON only with this schema:
 {{output_schema}}
 
 Review profile: {{profile}}
+Mandatory focus areas: Security, Performance, Compliance.
 
 Context:
 {{context_json}}

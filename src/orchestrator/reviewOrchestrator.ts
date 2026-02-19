@@ -67,7 +67,10 @@ export class Stage1ReviewOrchestrator {
     });
 
     try {
-    const profile = request.reviewProfile ?? "default";
+    // Profile selection is intentionally disabled in panel UX.
+    // Always use default profile and rely on prompt instructions to cover
+    // security/performance/compliance together.
+    const profile = "default";
     const githubResult = await this.runStep("fetch-github-context", () =>
       this.fetchGithubContextSkill.run({ request }, this.context)
     );

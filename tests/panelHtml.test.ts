@@ -6,8 +6,8 @@ test("getPanelHtml renders required controls and message contract", () => {
   const html = getPanelHtml("nonce-123");
 
   assert.match(html, /id="prLink"/);
-  assert.match(html, /id="profile"/);
-  assert.match(html, /id="keywords"/);
+  assert.doesNotMatch(html, /id="profile"/);
+  assert.doesNotMatch(html, /id="keywords"/);
   assert.match(html, /id="draft"/);
   assert.match(html, /id="reviewBtn"/);
   assert.match(html, /id="publishBtn"/);

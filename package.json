@@ -25,7 +25,8 @@
       "prReviewer": [
         {
           "id": "prReviewer.panel",
-          "name": "PR Reviewer"
+          "name": "PR Reviewer",
+          "type": "webview"
         }
       ]
     },
@@ -157,6 +158,7 @@
     }
   },
   "description": "Stage 4 delivery: Full VS Code panel wiring for PR review pipeline",
+  "icon": "media/extension-icon.png",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "node --test --loader ts-node/esm tests/**/*.test.ts"

@@ -98,21 +98,6 @@ export function getPanelHtml(nonce: string): string {
     <label for="prLink">PR Link</label>
     <input id="prLink" type="text" placeholder="https://github.com/{owner}/{repo}/pull/{number}" />
     <div class="row">
-      <div style="flex:1;">
-        <label for="profile">Profile</label>
-        <select id="profile">
-          <option value="default">default</option>
-          <option value="security">security</option>
-          <option value="performance">performance</option>
-          <option value="compliance">compliance</option>
-        </select>
-      </div>
-      <div style="flex:2;">
-        <label for="keywords">Additional Keywords (comma separated)</label>
-        <input id="keywords" type="text" placeholder="auth, retry, rollback" />
-      </div>
-    </div>
-    <div class="row">
       <button id="reviewBtn" class="primary">Run Review</button>
     </div>
   </div>
@@ -132,8 +117,6 @@ export function getPanelHtml(nonce: string): string {
     const state = { prLink: "", canPublish: false };
     const els = {
       prLink: document.getElementById("prLink"),
-      profile: document.getElementById("profile"),
-      keywords: document.getElementById("keywords"),
       draft: document.getElementById("draft"),
       reviewBtn: document.getElementById("reviewBtn"),
       publishBtn: document.getElementById("publishBtn"),
@@ -147,15 +130,12 @@ export function getPanelHtml(nonce: string): string {
 
     function runReview() {
       const prLink = (els.prLink.value || "").trim();
-      const profile = els.profile.value;
-      const keywordText = (els.keywords.value || "").trim();
-      const additionalKeywords = keywordText ? keywordText.split(",").map(v => v.trim()).filter(Boolean) : [];
       state.prLink = prLink;
       state.canPublish = false;
       setStatus("Running review...", "");
       vscode.postMessage({
         type: "start-review",
-        payload: { prLink, reviewProfile: profile, additionalKeywords }
+        payload: { prLink }
       });
     }
 

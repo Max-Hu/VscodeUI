@@ -63,9 +63,7 @@ test("routePanelMessage routes start-review and returns review-completed", async
     {
       type: "start-review",
       payload: {
-        prLink: "https://github.com/acme/platform/pull/42",
-        reviewProfile: "security",
-        additionalKeywords: [" rollback ", "monitoring"]
+        prLink: "https://github.com/acme/platform/pull/42"
       }
     },
     {
@@ -80,9 +78,7 @@ test("routePanelMessage routes start-review and returns review-completed", async
   );
 
   assert.deepEqual(capturedRequest, {
-    prLink: "https://github.com/acme/platform/pull/42",
-    reviewProfile: "security",
-    additionalKeywords: ["rollback", "monitoring"]
+    prLink: "https://github.com/acme/platform/pull/42"
   });
   assert.equal(outbound.type, "review-completed");
 });
