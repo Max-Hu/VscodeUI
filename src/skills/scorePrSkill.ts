@@ -1,4 +1,5 @@
 import type {
+  ConfluenceContext,
   GithubContext,
   JiraContext,
   ReviewProfile,
@@ -6,13 +7,15 @@ import type {
   ScoreDimension,
   ScoreResult
 } from "../domain/types.js";
-import { clampScore, confidenceFromSignals, weightedOverallScore } from "../utils/scoring.js";
+import { buildScorePrompt } from "../llm/prompts.js";
+import { parseJsonFromLlm } from "../utils/llmJson.js";
 import type { SkillContext } from "./context.js";
 import type { Skill } from "./skill.js";
 
 export interface ScorePrInput {
   githubContext: GithubContext;
   jiraContext: JiraContext;
+  confluenceContext: ConfluenceContext;
   profile: ReviewProfile;
 }
 
@@ -20,7 +23,22 @@ export interface ScorePrOutput {
   score: ScoreResult;
 }
 
-const DIMENSIONS: ScoreDimension[] = [
+interface LlmScorePayload {
+  overallScore: number;
+  scoreBreakdown: Array<{
+    dimension: ScoreDimension;
+    score: number;
+    weight?: number;
+    rationale: string;
+  }>;
+  evidence?: Array<{
+    file?: string;
+    snippet?: string;
+  }>;
+  confidence: "low" | "medium" | "high";
+}
+
+const VALID_DIMENSIONS: ScoreDimension[] = [
   "Correctness",
   "Maintainability",
   "Reliability",
@@ -32,108 +50,76 @@ const DIMENSIONS: ScoreDimension[] = [
 
 export class ScorePrSkill implements Skill<ScorePrInput, ScorePrOutput, SkillContext> {
   id = "score-pr";
-  description = "Generate deterministic stage-1 score from PR and Jira context.";
+  description = "Generate score and rationale using LLM only.";
 
   async run(input: ScorePrInput, context: SkillContext): Promise<ScorePrOutput> {
-    const { githubContext, jiraContext, profile } = input;
-    const checks = githubContext.checks;
-    const files = githubContext.files;
-    const keywords = new Set(githubContext.signals.keywords.map((k) => k.toLowerCase()));
-    const hasFailures = checks.some((check) => check.conclusion === "failure" || check.conclusion === "timed_out");
-    const successChecks = checks.filter((check) => check.conclusion === "success").length;
-    const hasChecks = checks.length > 0;
-    const hasTestFiles = files.some((file) => /(^|\/)(test|tests|__tests__)\//i.test(file.path) || /\.test\./i.test(file.path));
-    const totalPatchChars = files.reduce((sum, file) => sum + file.patch.length, 0);
-    const jiraCoverageRatio = jiraContext.requestedKeys.length
-      ? jiraContext.issues.length / jiraContext.requestedKeys.length
-      : 0;
+    if (!context.llm) {
+      throw new Error("LLM provider is required for score-pr. Configure Copilot provider.");
+    }
 
-    const scores: Record<ScoreDimension, number> = {
-      Correctness: clampScore(70 + successChecks * 4 - (hasFailures ? 25 : 0) - (!hasChecks ? 5 : 0)),
-      Maintainability: clampScore(88 - files.length * 1.5 - totalPatchChars / 3000),
-      Reliability: clampScore(72 + (hasChecks ? 8 : 0) - (hasFailures ? 20 : 0)),
-      Security: clampScore(
-        70 +
-          (profile === "security" ? 8 : 0) +
-          (keywords.has("security") || keywords.has("auth") ? 4 : 0) -
-          (hasFailures ? 5 : 0)
-      ),
-      Performance: clampScore(
-        70 + (profile === "performance" ? 8 : 0) + (keywords.has("performance") || keywords.has("cache") ? 4 : 0)
-      ),
-      "Test Quality": clampScore(55 + (hasTestFiles ? 25 : 0) + (hasChecks ? 10 : 0)),
-      Traceability: clampScore(45 + jiraCoverageRatio * 55)
-    };
-
-    const scoreBreakdown: ScoreBreakdownItem[] = DIMENSIONS.map((dimension) => ({
-      dimension,
-      score: scores[dimension],
-      weight: context.config.scoring.weights[dimension],
-      rationale: buildRationale(dimension, {
-        hasChecks,
-        hasFailures,
-        hasTestFiles,
-        jiraCoverageRatio,
-        profile
-      })
-    }));
-
-    const evidence = [
-      ...files.slice(0, 3).map((file) => ({
-        file: file.path,
-        snippet: file.patch.slice(0, 220)
-      })),
-      ...jiraContext.issues.slice(0, 2).map((issue) => ({
-        snippet: `${issue.key}: ${issue.summary}`
-      }))
-    ];
-
-    const score: ScoreResult = {
-      overallScore: weightedOverallScore(scoreBreakdown),
-      scoreBreakdown,
-      evidence,
-      confidence: confidenceFromSignals({
-        checksCount: checks.length,
-        jiraIssueCount: jiraContext.issues.length,
-        hasFailures
-      })
-    };
-
+    const prompt = buildScorePrompt({
+      profile: input.profile,
+      githubContext: input.githubContext,
+      jiraContext: input.jiraContext,
+      confluenceContext: input.confluenceContext
+    });
+    const raw = await context.llm.generate(prompt);
+    const payload = parseJsonFromLlm<LlmScorePayload>(raw);
+    const score = validateAndNormalize(payload, context.config.scoring.weights);
     return { score };
   }
 }
 
-function buildRationale(
-  dimension: ScoreDimension,
-  input: {
-    hasChecks: boolean;
-    hasFailures: boolean;
-    hasTestFiles: boolean;
-    jiraCoverageRatio: number;
-    profile: ReviewProfile;
+function validateAndNormalize(
+  payload: LlmScorePayload,
+  defaultWeights: Record<ScoreDimension, number>
+): ScoreResult {
+  if (typeof payload.overallScore !== "number" || payload.overallScore < 0 || payload.overallScore > 100) {
+    throw new Error("Invalid LLM score: overallScore must be a number in [0,100].");
   }
-): string {
-  const { hasChecks, hasFailures, hasTestFiles, jiraCoverageRatio, profile } = input;
-  switch (dimension) {
-    case "Correctness":
-      return hasFailures ? "CI contains failed checks; correctness confidence reduced." : "No failing checks observed.";
-    case "Maintainability":
-      return "Patch volume and changed file count were used for maintainability estimation.";
-    case "Reliability":
-      return hasChecks ? "Automated checks exist and contribute to reliability signal." : "Missing checks lowers reliability confidence.";
-    case "Security":
-      return profile === "security"
-        ? "Security profile increases strictness and weight of security signals."
-        : "Security score based on keywords and check outcomes.";
-    case "Performance":
-      return profile === "performance"
-        ? "Performance profile increases performance sensitivity."
-        : "Performance score based on repository signals only.";
-    case "Test Quality":
-      return hasTestFiles ? "Test-related file changes detected." : "No explicit test-file changes detected.";
-    case "Traceability":
-      return `Jira coverage ratio is ${(jiraCoverageRatio * 100).toFixed(0)}%.`;
-    default:
-      return "Scored from available signals.";
+  if (!Array.isArray(payload.scoreBreakdown) || payload.scoreBreakdown.length === 0) {
+    throw new Error("Invalid LLM score: scoreBreakdown is required.");
   }
+  if (!["low", "medium", "high"].includes(payload.confidence)) {
+    throw new Error("Invalid LLM score: confidence must be low/medium/high.");
+  }
+
+  const seen = new Set<string>();
+  const scoreBreakdown: ScoreBreakdownItem[] = payload.scoreBreakdown.map((item) => {
+    if (!VALID_DIMENSIONS.includes(item.dimension)) {
+      throw new Error(`Invalid LLM score dimension: ${String(item.dimension)}`);
+    }
+    if (seen.has(item.dimension)) {
+      throw new Error(`Duplicated LLM score dimension: ${item.dimension}`);
+    }
+    seen.add(item.dimension);
+    if (typeof item.score !== "number" || item.score < 0 || item.score > 100) {
+      throw new Error(`Invalid LLM score value for ${item.dimension}`);
+    }
+    if (typeof item.rationale !== "string" || !item.rationale.trim()) {
+      throw new Error(`Invalid LLM rationale for ${item.dimension}`);
+    }
+    return {
+      dimension: item.dimension,
+      score: Math.round(item.score),
+      weight: typeof item.weight === "number" ? item.weight : defaultWeights[item.dimension],
+      rationale: item.rationale.trim()
+    };
+  });
+
+  if (seen.size !== VALID_DIMENSIONS.length) {
+    throw new Error("Invalid LLM score: all 7 dimensions must be present.");
+  }
+
+  return {
+    overallScore: Math.round(payload.overallScore),
+    scoreBreakdown,
+    evidence: Array.isArray(payload.evidence)
+      ? payload.evidence.map((item) => ({
+          ...(typeof item.file === "string" ? { file: item.file } : {}),
+          ...(typeof item.snippet === "string" ? { snippet: item.snippet } : {})
+        }))
+      : [],
+    confidence: payload.confidence
+  };
 }

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { buildStage1ConfigPatchFromFlatSettings } from "../src/config/vscodeSettings.js";
 
-test("buildStage1ConfigPatchFromFlatSettings maps github and jira provider settings", () => {
+test("buildStage1ConfigPatchFromFlatSettings maps github jira and confluence provider settings", () => {
   const patch = buildStage1ConfigPatchFromFlatSettings({
     "providers.github.domain": "https://api.github.com",
     "providers.github.credential.mode": "pat",
@@ -10,7 +10,15 @@ test("buildStage1ConfigPatchFromFlatSettings maps github and jira provider setti
     "providers.jira.domain": "https://acme.atlassian.net",
     "providers.jira.credential.mode": "basic",
     "providers.jira.credential.usernameRef": "jira_user",
-    "providers.jira.credential.passwordRef": "jira_pass"
+    "providers.jira.credential.passwordRef": "jira_pass",
+    "providers.confluence.domain": "https://acme.atlassian.net/wiki",
+    "providers.confluence.credential.mode": "oauth",
+    "providers.confluence.credential.tokenRef": "confluence_token",
+    "llm.mode": "copilot",
+    "post.enabled": true,
+    "post.requireConfirmation": true,
+    "resilience.continueOnConfluenceError": true,
+    "observability.enabled": false
   });
 
   assert.deepEqual(patch, {
@@ -29,7 +37,27 @@ test("buildStage1ConfigPatchFromFlatSettings maps github and jira provider setti
           usernameRef: "jira_user",
           passwordRef: "jira_pass"
         }
+      },
+      confluence: {
+        domain: "https://acme.atlassian.net/wiki",
+        credential: {
+          mode: "oauth",
+          tokenRef: "confluence_token"
+        }
       }
+    },
+    llm: {
+      mode: "copilot"
+    },
+    post: {
+      enabled: true,
+      requireConfirmation: true
+    },
+    resilience: {
+      continueOnConfluenceError: true
+    },
+    observability: {
+      enabled: false
     }
   });
 });

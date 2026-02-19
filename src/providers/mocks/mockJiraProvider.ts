@@ -4,7 +4,7 @@ import type { IJiraProvider } from "../jiraProvider.js";
 export class MockJiraProvider implements IJiraProvider {
   constructor(private readonly issues: JiraIssueContext[]) {}
 
-  async getIssues(keys: string[]): Promise<JiraIssueContext[]> {
+  async getIssues(keys: string[], _options: { expandDepth: number }): Promise<JiraIssueContext[]> {
     const normalized = new Set(keys.map((key) => key.toUpperCase()));
     return this.issues.filter((issue) => normalized.has(issue.key.toUpperCase()));
   }

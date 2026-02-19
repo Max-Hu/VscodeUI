@@ -76,6 +76,7 @@ export interface JiraIssueContext {
   nfr: string[];
   risks: string[];
   testingRequirements: string[];
+  links?: string[];
 }
 
 export interface JiraContext {
@@ -83,11 +84,36 @@ export interface JiraContext {
   issues: JiraIssueContext[];
 }
 
+export type ConfluenceRetrievalSource = "issue-link" | "pr-link" | "jira-query" | "keyword-query";
+
+export interface ConfluencePageContext {
+  id: string;
+  title: string;
+  url: string;
+  content: string;
+  source: ConfluenceRetrievalSource;
+  relevanceScore?: number;
+  matchedJiraKeys?: string[];
+  matchedKeywords?: string[];
+}
+
+export interface ConfluenceContext {
+  strongLinkedUrls: string[];
+  searchQueries: string[];
+  pages: ConfluencePageContext[];
+}
+
+export interface TraceabilityContext {
+  jiraToConfluence: Record<string, string[]>;
+}
+
 export interface ReviewContext {
   prReference: PrReference;
   profile: ReviewProfile;
   github: GithubContext;
   jira: JiraContext;
+  confluence: ConfluenceContext;
+  traceability: TraceabilityContext;
 }
 
 export type ScoreDimension =
@@ -122,8 +148,36 @@ export interface DraftComment {
   markdown: string;
 }
 
+export interface PublishCommentRequest {
+  prLink: string;
+  commentBody: string;
+  confirmed: boolean;
+}
+
+export interface PublishedComment {
+  id: string;
+  url: string;
+  body: string;
+}
+
+export interface PublishCommentResult {
+  published: boolean;
+  usedEditedBody: boolean;
+  comment: PublishedComment;
+}
+
 export interface Stage1ReviewResult {
   context: ReviewContext;
   score: ScoreResult;
   draft: DraftComment;
+  warnings?: string[];
+}
+
+export interface RunMetadata {
+  durationMs: number;
+  usedLlm: boolean;
+}
+
+export interface Stage3ReviewResult extends Stage1ReviewResult {
+  meta: RunMetadata;
 }

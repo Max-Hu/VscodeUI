@@ -26,6 +26,20 @@ export interface Stage1Config {
   providers: {
     github: ProviderConnectionConfig;
     jira: ProviderConnectionConfig;
+    confluence: ProviderConnectionConfig;
+  };
+  llm: {
+    mode: "copilot" | "mock";
+  };
+  post: {
+    enabled: boolean;
+    requireConfirmation: boolean;
+  };
+  resilience: {
+    continueOnConfluenceError: boolean;
+  };
+  observability: {
+    enabled: boolean;
   };
   scoring: {
     weights: Record<ScoreDimension, number>;

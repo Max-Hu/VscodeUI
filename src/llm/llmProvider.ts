@@ -3,7 +3,9 @@ export interface ILlmProvider {
 }
 
 export class MockLlmProvider implements ILlmProvider {
-  async generate(prompt: string): Promise<string> {
-    return `MOCK_RESPONSE:\n${prompt}`;
+  constructor(private readonly response: string = "{\"markdown\":\"## Mock Draft\"}") {}
+
+  async generate(_prompt: string): Promise<string> {
+    return this.response;
   }
 }

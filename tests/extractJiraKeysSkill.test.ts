@@ -10,10 +10,21 @@ const context: SkillContext = {
     github: {
       async getPullRequest() {
         throw new Error("not used");
+      },
+      async publishReviewComment() {
+        throw new Error("not used");
       }
     },
     jira: {
       async getIssues() {
+        throw new Error("not used");
+      }
+    },
+    confluence: {
+      async getPagesByUrls() {
+        throw new Error("not used");
+      },
+      async searchPages() {
         throw new Error("not used");
       }
     }

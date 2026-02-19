@@ -1,0 +1,110 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { defaultStage1Config } from "../src/config/defaults.js";
+import { MockConfluenceProvider } from "../src/providers/mocks/mockConfluenceProvider.js";
+import { FetchConfluenceContextSkill } from "../src/skills/fetchConfluenceContextSkill.js";
+import type { SkillContext } from "../src/skills/context.js";
+
+test("FetchConfluenceContextSkill prefers strong links and performs query expansion", async () => {
+  const provider = new MockConfluenceProvider({
+    byUrl: {
+      "https://example.atlassian.net/wiki/spaces/ENG/pages/101": {
+        id: "101",
+        title: "PROJ-123 Design",
+        url: "https://example.atlassian.net/wiki/spaces/ENG/pages/101",
+        content: "API and rollback plan"
+      }
+    },
+    byQuery: {
+      "proj-123": [
+        {
+          id: "101",
+          title: "PROJ-123 Design",
+          url: "https://example.atlassian.net/wiki/spaces/ENG/pages/101",
+          content: "duplicate from query"
+        }
+      ],
+      retry: [
+        {
+          id: "205",
+          title: "Retry Runbook",
+          url: "https://example.atlassian.net/wiki/spaces/SRE/pages/205",
+          content: "monitoring and incident response"
+        }
+      ]
+    }
+  });
+
+  const context: SkillContext = {
+    config: {
+      ...defaultStage1Config,
+      topK: 10
+    },
+    providers: {
+      github: {
+        async getPullRequest() {
+          throw new Error("not used");
+        },
+        async publishReviewComment() {
+          throw new Error("not used");
+        }
+      },
+      jira: {
+        async getIssues() {
+          throw new Error("not used");
+        }
+      },
+      confluence: provider
+    }
+  };
+
+  const skill = new FetchConfluenceContextSkill();
+  const result = await skill.run(
+    {
+      githubContext: {
+        metadata: {
+          title: "PROJ-123",
+          body: "Design link: https://example.atlassian.net/wiki/spaces/ENG/pages/101",
+          author: "alice",
+          baseBranch: "main",
+          headBranch: "feature",
+          url: "https://github.com/acme/platform/pull/42"
+        },
+        files: [],
+        commits: [],
+        checks: [],
+        comments: [],
+        signals: {
+          confluenceLinks: ["https://example.atlassian.net/wiki/spaces/ENG/pages/101"],
+          keywords: ["retry"]
+        }
+      },
+      jiraContext: {
+        requestedKeys: ["PROJ-123"],
+        issues: [
+          {
+            key: "PROJ-123",
+            summary: "Add retry",
+            description: "",
+            acceptanceCriteria: ["retries max 3"],
+            nfr: [],
+            risks: [],
+            testingRequirements: [],
+            links: ["https://example.atlassian.net/wiki/spaces/ENG/pages/101"]
+          }
+        ]
+      }
+    },
+    context
+  );
+
+  assert.equal(result.confluence.strongLinkedUrls.length, 1);
+  assert.ok(result.confluence.searchQueries.includes("PROJ-123"));
+  assert.ok(result.confluence.pages.some((page) => page.source === "issue-link"));
+  assert.ok(result.confluence.pages.some((page) => page.source === "keyword-query"));
+  assert.equal(
+    result.confluence.pages.filter((page) => page.url === "https://example.atlassian.net/wiki/spaces/ENG/pages/101")
+      .length,
+    1
+  );
+});

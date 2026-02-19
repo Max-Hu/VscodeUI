@@ -18,7 +18,26 @@ export const defaultStage1Config: Stage1Config = {
       credential: {
         mode: "none"
       }
+    },
+    confluence: {
+      domain: "https://your-domain.atlassian.net/wiki",
+      credential: {
+        mode: "none"
+      }
     }
+  },
+  llm: {
+    mode: "copilot"
+  },
+  post: {
+    enabled: true,
+    requireConfirmation: true
+  },
+  resilience: {
+    continueOnConfluenceError: true
+  },
+  observability: {
+    enabled: true
   },
   scoring: {
     weights: {

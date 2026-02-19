@@ -14,6 +14,22 @@ export interface ReviewCompletedMessage {
   payload: Stage1ReviewResult;
 }
 
+export interface PublishReviewMessage {
+  type: "publish-review";
+  payload: {
+    prLink: string;
+    commentBody: string;
+    confirmed: boolean;
+  };
+}
+
+export interface PublishCompletedMessage {
+  type: "publish-completed";
+  payload: {
+    commentUrl: string;
+  };
+}
+
 export interface ReviewFailedMessage {
   type: "review-failed";
   payload: {
@@ -21,5 +37,5 @@ export interface ReviewFailedMessage {
   };
 }
 
-export type PanelInboundMessage = StartReviewMessage;
-export type PanelOutboundMessage = ReviewCompletedMessage | ReviewFailedMessage;
+export type PanelInboundMessage = StartReviewMessage | PublishReviewMessage;
+export type PanelOutboundMessage = ReviewCompletedMessage | PublishCompletedMessage | ReviewFailedMessage;

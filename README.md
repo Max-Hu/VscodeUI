@@ -1,30 +1,37 @@
-# VS Code PR Reviewer - Stage 1 Delivery
+# VS Code PR Reviewer - Stage 3 Delivery
 
-This repository now contains a stage-1 implementation of the pipeline:
+This repository now contains a stage-3 implementation of the pipeline:
 
-`PR link -> GitHub context -> Jira key extraction -> Jira context -> score -> markdown draft`
+`PR link -> GitHub context -> Jira key extraction -> Jira context -> Confluence context -> relevance aggregation -> score -> draft -> publish`
 
 ## Scope implemented
 
 - PR link parsing and validation (`github.com/{owner}/{repo}/pull/{number}`)
 - Skill-based pipeline with orchestrator
-- Required stage-1 skills:
+- Required skills:
   - `fetch-github-context`
   - `extract-jira-keys`
   - `fetch-jira-context`
+  - `fetch-confluence-context`
   - `aggregate-context`
   - `score-pr`
   - `draft-comment`
+  - `publish-comment`
 - Config-driven thresholds and scoring weights
 - Provider abstraction with mock providers
-- Basic `views` and `security` contracts for next-stage integration
-- Unit-test files for parser, skill behavior, scoring, and orchestrator flow
+- Confluence retrieval strategy (strong-link first, then query expansion)
+- Relevance ranking + topK truncation + Jira->Confluence traceability mapping
+- Copilot LLM is the only scoring/evaluation engine (no local-rule scoring fallback)
+- Publish confirmation gate and edited-text publish flow
+- Pipeline observability events and degraded-mode warnings
+- Unit-test files for parser, skill behavior, aggregation/ranking, scoring, publish, and orchestrator flow
 
 ## Structure
 
-- `src/orchestrator`: stage-1 flow orchestration
+- `src/orchestrator`: stage-3 flow orchestration
 - `src/skills`: pluggable skills
 - `src/providers`: external-system interfaces and mocks
+- `src/observability`: pipeline event observer interfaces
 - `src/domain`: core types
 - `src/config`: config schema and defaults
 - `src/utils`: parsing/extraction/scoring helpers
@@ -42,6 +49,8 @@ Provider-related config now includes domain and credential:
 - `providers.github.credential`
 - `providers.jira.domain`
 - `providers.jira.credential`
+- `providers.confluence.domain`
+- `providers.confluence.credential`
 
 Credential config shape:
 
@@ -50,12 +59,21 @@ Credential config shape:
 - `usernameRef`: secret key name for basic auth username
 - `passwordRef`: secret key name for basic auth password
 
+Stage-3 runtime config:
+
+- `llm.mode`: `copilot | mock`
+- `post.enabled`: `true | false`
+- `post.requireConfirmation`: `true | false`
+- `resilience.continueOnConfluenceError`: `true | false`
+- `observability.enabled`: `true | false`
+
 Example:
 
 ```ts
 const orchestrator = new Stage1ReviewOrchestrator({
   githubProvider,
   jiraProvider,
+  confluenceProvider,
   config: {
     providers: {
       github: {
@@ -65,7 +83,24 @@ const orchestrator = new Stage1ReviewOrchestrator({
       jira: {
         domain: "https://acme.atlassian.net",
         credential: { mode: "basic", usernameRef: "jira_user", passwordRef: "jira_pass" }
+      },
+      confluence: {
+        domain: "https://acme.atlassian.net/wiki",
+        credential: { mode: "oauth", tokenRef: "confluence_oauth" }
       }
+    },
+    llm: {
+      mode: "copilot"
+    },
+    post: {
+      enabled: true,
+      requireConfirmation: true
+    },
+    resilience: {
+      continueOnConfluenceError: true
+    },
+    observability: {
+      enabled: true
     }
   }
 });
@@ -91,9 +126,24 @@ Settings example (`.vscode/settings.json`):
   "prReviewer.providers.jira.domain": "https://acme.atlassian.net",
   "prReviewer.providers.jira.credential.mode": "basic",
   "prReviewer.providers.jira.credential.usernameRef": "jira_user",
-  "prReviewer.providers.jira.credential.passwordRef": "jira_pass"
+  "prReviewer.providers.jira.credential.passwordRef": "jira_pass",
+
+  "prReviewer.providers.confluence.domain": "https://acme.atlassian.net/wiki",
+  "prReviewer.providers.confluence.credential.mode": "oauth",
+  "prReviewer.providers.confluence.credential.tokenRef": "confluence_oauth",
+
+  "prReviewer.llm.mode": "copilot",
+  "prReviewer.post.enabled": true,
+  "prReviewer.post.requireConfirmation": true,
+  "prReviewer.resilience.continueOnConfluenceError": true,
+  "prReviewer.observability.enabled": true
 }
 ```
+
+Prompt template hot reload (for local prompt editing):
+
+- `PR_REVIEWER_PROMPT_HOT_RELOAD=true`
+- optional `PR_REVIEWER_PROMPT_TEMPLATE_DIR=<absolute-path-to-templates>`
 
 Load config patch from VS Code settings:
 
@@ -104,13 +154,21 @@ const settingsPatch = await loadStage1ConfigPatchFromVsCodeSettings("prReviewer"
 const orchestrator = new Stage1ReviewOrchestrator({
   githubProvider,
   jiraProvider,
+  confluenceProvider,
   config: settingsPatch
 });
 ```
 
-## What is intentionally deferred to stage 2/3
+Publish edited comment:
 
-- Confluence retrieval and relevance-ranking optimization
-- Publish-comment flow and confirmation modal behavior
-- Copilot runtime integration via `vscode.lm` in extension host
+```ts
+const publishResult = await orchestrator.publishEditedComment({
+  prLink: "https://github.com/acme/platform/pull/42",
+  commentBody: "Edited markdown by human reviewer",
+  confirmed: true
+});
+```
+
+## What is intentionally deferred to stage 4+
+
 - Full VS Code webview/panel rendering and UX wiring
