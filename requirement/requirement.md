@@ -1,390 +1,244 @@
-# VS Code PR Reviewer 插件 — 完整实现需求文档（Codex 可执行版）
+﻿# Product Requirement Specification
 
-> 目标：构建一个 **高可用 / 高可复用 / 易读懂 / 易扩展** 的 VS Code 插件  
-> 形式：Panel（WebviewView）  
-> 架构：内部 Agent Skills Pipeline  
-> LLM：优先使用用户本地 Copilot（VS Code LM API）  
-> 上下文来源：GitHub + Jira + Confluence  
-> 输入：仅 PR link  
+## 1. Goal
 
----
+Build a VS Code extension panel that accepts a PR link and produces a complete review workflow:
 
-# 1. 总体目标
+- aggregate GitHub, Jira, and Confluence context
+- evaluate and score with Copilot
+- generate an editable markdown draft
+- publish after explicit confirmation
 
-构建一个企业级 PR 审计插件，具备以下能力：
+## 2. Input and Trigger
 
-- 用户仅输入 **PR link**
-- 自动解析 PR 信息
-- 从 commit message 强制提取 Jira ID
-- 自动关联 Jira issue 与 Confluence 页面
-- 聚合多源上下文
-- 对 PR 实现代码进行评分（0–100）
-- 生成结构化审计结果
-- 生成可发布评论草稿
-- 用户可编辑后再发布
-- 所有能力基于内部 Skills 架构实现
-- 所有核心逻辑具备单元测试
-- 代码风格：简洁、低耦合、高内聚、可替换、可扩展
+### 2.1 User Input (Panel)
 
----
+- PR link (required)
+- Review profile (optional): `default | security | performance | compliance`
+- Additional keywords (optional)
 
-# 2. 输入与触发
+### 2.2 PR Link Rules
 
-## 2.1 输入字段（Panel UI）
+Only support GitHub PR URLs in this format:
 
-- PR link（唯一必填）
-- Review Profile（default/security/performance/compliance）
-- Additional Keywords（可选）
+`https://github.com/{owner}/{repo}/pull/{number}`
 
-## 2.2 PR link 解析规则
-
-必须支持 GitHub PR URL：
-
-https://github.com/{owner}/{repo}/pull/{number}
-
-
-解析出：
+Parser must extract:
 
 - owner
 - repo
 - prNumber
 
-非法 URL 必须提示错误，不允许继续执行。
+Invalid URLs must fail fast with a clear error.
 
----
+## 3. Architecture Constraints
 
-# 3. 架构原则
+### 3.1 Layering
 
-## 3.1 分层设计（强制）
+- `views/`: UI and message transport only
+- `orchestrator/`: workflow composition
+- `skills/`: pluggable capability units
+- `providers/`: GitHub/Jira/Confluence adapters
+- `llm/`: LLM abstraction
+- `domain/`: business types
+- `config/`: settings and defaults
+- `security/`: secret handling
+- `utils/`: shared helpers
 
-views/ → 仅 UI 与 message 通信
-orchestrator/ → 流程编排
-skills/ → 可插拔技能
-providers/ → GitHub / Jira / Confluence 适配
-llm/ → LLM Provider 抽象
-domain/ → 类型定义
-config/ → Settings
-security/ → SecretStorage 管理
-utils/ → 通用工具
+### 3.2 Hard Rules
 
+- No business logic in `extension.ts`
+- Webview must not access secrets directly
+- Providers must not call each other directly
 
-### 禁止：
+## 4. Skills Pipeline
 
-- 业务逻辑写在 extension.ts
-- Webview 直接访问 token
-- Provider 之间相互调用
+Required skills:
 
----
+1. `fetch-github-context`
+- load metadata, files/patches, commits, checks, comments
+- extract signals: Jira keys, Confluence links, keywords
 
-# 4. 内部 Agent Skills 架构（路线 A）
+2. `extract-jira-keys`
+- extract Jira keys from commit messages
+- regex configurable
+- deduplicate and sort
 
-## 4.1 Skill 接口
+3. `fetch-jira-context`
+- retrieve issues by keys
+- optional graph expansion (`depth`)
+- extract summary/description/AC/NFR/risk/testing requirements
+
+4. `fetch-confluence-context`
+- strong-link first (issue links + PR links)
+- fallback query expansion
+- optional related page expansion
+
+5. `aggregate-context`
+- deduplicate, rank by relevance, truncate by topK
+- produce final `ReviewContext`
+- preserve Jira -> Confluence traceability mapping
+
+6. `score-pr`
+- compute `overallScore` (0-100)
+- output dimension breakdown, evidence, confidence
+
+7. `draft-comment`
+- generate markdown review draft
+
+8. `publish-comment`
+- publish edited draft text
+- requires explicit confirmation
+
+## 5. Context Retrieval Strategy
+
+### 5.1 Retrieval Order
+
+- Strong association first
+- Weak association second
+- Optional expansion last
+
+### 5.2 GitHub Scope
+
+Required data:
+
+- PR metadata
+- changed files + patch (with truncation)
+- commits (must support Jira extraction from commit messages)
+- check status
+- comments
+
+Truncation controls:
+
+- `maxFiles`
+- `maxPatchCharsPerFile`
+- mark truncation explicitly
+
+### 5.3 Jira Scope
+
+- exact key lookup
+- optional parent/epic/children expansion
+- prioritize AC, NFR, risk, testing requirements
+
+### 5.4 Confluence Scope
+
+Priority:
+
+1. links from Jira issues
+2. links from PR text/comments
+3. keyword/Jira-based search
+
+## 6. Scoring Output Contract
 
 ```ts
-interface Skill<TInput, TOutput> {
-  id: string;
-  description: string;
-  run(input: TInput, context: SkillContext): Promise<TOutput>;
-}
-4.2 必须实现的 Skills
-1️⃣ fetch-github-context
-拉 PR metadata
-
-拉 files + patch（裁剪）
-
-拉 commits
-
-拉 checks
-
-抽取 signals：
-
-jiraKeys[]
-
-confluenceLinks[]
-
-keywords[]
-
-2️⃣ extract-jira-keys
-从 commit message 提取 Jira ID
-
-正则可配置
-
-去重 + 排序
-
-3️⃣ fetch-jira-context
-按 jiraKeys 精准拉 issue
-
-扩展 parent/epic/children（depth=1 默认）
-
-抽取：
-
-summary
-
-description
-
-Acceptance Criteria
-
-NFR
-
-风险
-
-测试要求
-
-4️⃣ fetch-confluence-context
-优先从 issue 链接获取页面
-
-否则 CQL 搜索
-
-扩展 children / related（depth=1 默认）
-
-抽取：
-
-Scope
-
-Requirements
-
-API 契约
-
-Security
-
-Rollback
-
-Monitoring
-
-5️⃣ aggregate-context
-去重
-
-relevanceScore 排序
-
-topK 截断
-
-构建 ReviewContext
-
-保留 traceability 映射
-
-6️⃣ score-pr
-计算 overallScore（0–100）
-
-输出 scoreBreakdown
-
-输出 evidence
-
-输出 confidence
-
-7️⃣ draft-comment
-生成 Markdown 草稿
-
-8️⃣ publish-comment
-使用编辑后的 commentBody 发布
-
-二次确认
-
-5. 上下文查询策略（必须实现）
-5.1 强关联 → 弱关联 → 扩展
-Round1
-PR → commit → Jira key
-
-PR 文本 → Confluence 链接
-
-Round2（可配置）
-用 Jira summary/AC → 扩展搜索 Confluence
-
-用关键词 → JQL / CQL 弱召回
-
-5.2 GitHub 查询内容
-必须获取：
-
-PR metadata
-
-changed files + patch
-
-commits（强制包含 Jira ID）
-
-checks/CI 状态
-
-评论
-
-裁剪规则：
-
-maxFiles
-
-maxPatchCharsPerFile
-
-超限标记 TRUNCATED
-
-5.3 Jira 查询内容
-精准 key 查询
-
-issue links 扩展
-
-抽取 AC/NFR
-
-relevanceScore 排序
-
-5.4 Confluence 查询内容
-优先级：
-
-issue 中链接
-
-key 搜索
-
-关键词搜索
-
-扩展 depth=1
-
-6. 评分系统设计
-6.1 输出结构
 {
   overallScore: number;
-  scoreBreakdown: [
-    {
-      dimension: string;
-      score: number;
-      weight: number;
-      rationale: string;
-    }
-  ];
-  evidence: [
-    {
-      file?: string;
-      snippet?: string;
-    }
-  ];
+  scoreBreakdown: Array<{
+    dimension: string;
+    score: number;
+    weight: number;
+    rationale: string;
+  }>;
+  evidence: Array<{
+    file?: string;
+    snippet?: string;
+  }>;
   confidence: "low" | "medium" | "high";
 }
-6.2 默认评分维度
-Correctness
+```
 
-Maintainability
+Default dimensions:
 
-Reliability
+- Correctness
+- Maintainability
+- Reliability
+- Security
+- Performance
+- Test Quality
+- Traceability
 
-Security
+Weights must be configurable.
 
-Performance
+## 7. LLM Integration
 
-Test Quality
+### 7.1 Contract
 
-Traceability
-
-权重必须可配置。
-
-7. LLM 集成（Copilot 优先）
-7.1 LLM Provider 抽象
+```ts
 interface ILlmProvider {
   generate(prompt: string): Promise<string>;
 }
-7.2 支持模式
-copilot（默认）
+```
 
-external
+### 7.2 Modes
 
-mock
+- `copilot` (default)
+- `external`
+- `mock`
 
-7.3 Copilot 调用
-使用 vscode.lm API
+### 7.3 Copilot Rules
 
-不自行管理 token
+- use VS Code LM API
+- do not manage Copilot tokens manually
+- degrade gracefully when unavailable
 
-不可用时 graceful degrade
+## 8. Publish Flow
 
-8. 发布流程
-生成 commentBody
+- generate draft comment
+- user edits in panel
+- click publish
+- show second confirmation
+- publish and show result URL
 
-UI 提供编辑器
+## 9. Configuration and Credentials
 
-点击发布
+### 9.1 Settings
 
-弹 modal 二次确认
+- `expandDepth`
+- `topK`
+- `maxFiles`
+- `maxPatchCharsPerFile`
+- `scoring.weights`
+- `llm.mode`
+- `post.enabled`
 
-发布成功回显
+### 9.2 Credential Modes
 
-9. 参数与认证配置
-9.1 Settings 参数
-expandDepth
+- GitHub: `pat | oauth | vscodeAuth`
+- Jira: `pat | basic | oauth`
+- Confluence: `pat | basic | oauth`
 
-topK
+Sensitive values should come from SecretStorage.
 
-maxFiles
+## 10. Testing Requirements
 
-maxPatchCharsPerFile
+Must cover:
 
-scoring.weights
+- PR URL parsing
+- Jira key extraction
+- context truncation
+- relevance ranking
+- scoring logic
+- JSON parse/fallback handling
+- publish uses edited text
+- skill unit tests
+- orchestrator end-to-end tests with mocks
 
-llm.mode
+## 11. Code Quality Requirements
 
-post.enabled
+- small focused functions
+- single responsibility
+- interface-driven dependency injection
+- avoid circular dependencies
+- provider layer independent from UI
+- each skill testable in isolation
+- orchestrator handles sequencing only
 
-9.2 认证模式
-github: pat | oauth | vscodeAuth
+## 12. MVP Acceptance
 
-jira: pat | basic | oauth
-
-confluence: pat | basic | oauth
-
-敏感信息必须存 SecretStorage。
-
-10. 单元测试要求
-必须覆盖：
-
-PR link 解析
-
-Jira key 提取
-
-relevanceScore 排序
-
-上下文裁剪
-
-评分计算
-
-JSON 解析 fallback
-
-发布使用编辑后的文本
-
-Skill 独立测试
-
-Orchestrator 端到端（mock providers + mock llm）
-
-11. 代码风格要求
-必须满足：
-
-函数小而清晰
-
-单一职责
-
-依赖通过接口注入
-
-禁止循环依赖
-
-Provider 不依赖 UI
-
-Skill 可独立测试
-
-所有 I/O 逻辑集中在 Provider 层
-
-Orchestrator 只负责编排
-
-12. MVP 验收标准
-输入 PR link 可执行
-
-commit 中 Jira ID 可解析
-
-Jira/Confluence 上下文可关联
-
-输出评分 + 审计结果
-
-可编辑后成功发布
-
-单元测试通过
-
-Copilot 调用成功
-
-最终定义
-这是一个：
-
-基于 PR link 自动聚合 GitHub/Jira/Confluence 上下文的 VS Code Panel 插件，
-采用内部 Agent Skills 架构实现可扩展审计流程，
-支持代码评分与可编辑发布，
-调用用户本地 Copilot 进行智能分析，
-具备参数与认证可配置能力，
-并拥有完整单元测试保障与可持续扩展能力。
+- review runs from PR link input
+- Jira key extraction works from commits
+- Jira/Confluence context is linked
+- score + structured output produced
+- edited draft can be published
+- unit tests pass
+- Copilot call path works in extension host

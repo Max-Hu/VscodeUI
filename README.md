@@ -1,121 +1,157 @@
-# VS Code PR Reviewer - Stage 3 Delivery
+﻿# VS Code PR Reviewer
 
-This repository now contains a stage-3 implementation of the pipeline:
+VS Code PR Reviewer is an extension-oriented project that turns a single Pull Request link into a structured review workflow.
+It collects context from GitHub, Jira, and Confluence, asks VS Code Copilot to score and evaluate the change, generates an editable draft comment, and supports confirmed publishing.
 
-`PR link -> GitHub context -> Jira key extraction -> Jira context -> Confluence context -> relevance aggregation -> score -> draft -> publish`
+## Objectives
 
-## Scope implemented
+- Minimal input: only a PR link is required.
+- Context aggregation: combine GitHub, Jira, and Confluence signals.
+- Explainable review output: score, per-dimension breakdown, evidence, confidence.
+- Human-in-the-loop publishing: edit before publish and require confirmation.
+- Extensible architecture: skills pipeline + provider abstractions.
 
-- PR link parsing and validation (`github.com/{owner}/{repo}/pull/{number}`)
-- Skill-based pipeline with orchestrator
-- Required skills:
-  - `fetch-github-context`
-  - `extract-jira-keys`
-  - `fetch-jira-context`
-  - `fetch-confluence-context`
-  - `aggregate-context`
-  - `score-pr`
-  - `draft-comment`
-  - `publish-comment`
-- Config-driven thresholds and scoring weights
-- Provider abstraction with mock providers
-- Confluence retrieval strategy (strong-link first, then query expansion)
-- Relevance ranking + topK truncation + Jira->Confluence traceability mapping
-- Copilot LLM is the only scoring/evaluation engine (no local-rule scoring fallback)
-- Publish confirmation gate and edited-text publish flow
-- Pipeline observability events and degraded-mode warnings
-- Unit-test files for parser, skill behavior, aggregation/ranking, scoring, publish, and orchestrator flow
+## Current Stage Status
 
-## Structure
+- Stage 1: Done (PR parsing, Jira extraction, scoring, draft)
+- Stage 2: Done (Confluence retrieval, ranking, traceability)
+- Stage 3: Done (publish flow, resilience, observability)
+- Stage 4: Done (full VS Code Webview panel wiring)
 
-- `src/orchestrator`: stage-3 flow orchestration
-- `src/skills`: pluggable skills
-- `src/providers`: external-system interfaces and mocks
-- `src/observability`: pipeline event observer interfaces
-- `src/domain`: core types
-- `src/config`: config schema and defaults
-- `src/utils`: parsing/extraction/scoring helpers
+## End-to-End Flow
+
+`PR Link -> GitHub Context -> Jira Keys -> Jira Context -> Confluence Context -> Aggregate -> Score -> Draft -> Publish`
+
+## Architecture
+
+- `src/extension`: extension activation, panel provider, webview HTML, message routing
+- `src/orchestrator`: workflow orchestration
+- `src/skills`: pluggable business steps
+- `src/providers`: data source interfaces and implementations
+- `src/llm`: Copilot provider and prompt rendering
+- `src/config`: defaults, schema, VS Code settings mapping
 - `src/views`: panel message contracts
-- `src/security`: secret storage abstraction
-- `tests`: stage-1 unit and flow tests
+- `src/domain`: core domain models
+- `tests`: unit and integration-style flow tests
+
+## LLM Strategy
+
+- Default mode is `llm.mode = copilot`.
+- Scoring and evaluation are done by Copilot output.
+- Local rule-based scoring fallback is intentionally disabled.
+- `mock` mode is available for testing and local development.
+
+## Provider Runtime Behavior
+
+The stage-4 panel supports two runtime modes:
+
+- `prReviewer.providers.useDemoData = true` (default): use built-in demo providers
+- `prReviewer.providers.useDemoData = false`: use real HTTP providers
+
+Demo mode providers:
+
+- `DemoGithubProvider`
+- `DemoJiraProvider`
+- `DemoConfluenceProvider`
+
+Real mode providers:
+
+- `GithubRestProvider`
+- `JiraRestProvider`
+- `ConfluenceRestProvider`
+
+## Quick Start
+
+1. Install dependencies
+
+```bash
+npm install
+```
+
+2. Build
+
+```bash
+npm run build
+```
+
+3. Run tests
+
+```bash
+npm test
+```
+
+4. Debug in VS Code
+
+- Open this repository in VS Code.
+- Press `F5` to launch the Extension Development Host.
+- Open the `PR Reviewer` activity-bar view.
+- Run review with a PR link, edit the draft, and publish.
 
 ## Configuration
 
-`Stage1ReviewOrchestrator` supports partial config override.
+All settings are under `prReviewer.*`.
 
-Provider-related config now includes domain and credential:
+### Provider Settings
 
-- `providers.github.domain`
-- `providers.github.credential`
-- `providers.jira.domain`
-- `providers.jira.credential`
-- `providers.confluence.domain`
-- `providers.confluence.credential`
+- `prReviewer.providers.github.domain`
+- `prReviewer.providers.github.credential.mode`
+- `prReviewer.providers.github.credential.tokenRef`
+- `prReviewer.providers.jira.domain`
+- `prReviewer.providers.jira.credential.mode`
+- `prReviewer.providers.jira.credential.tokenRef`
+- `prReviewer.providers.jira.credential.usernameRef`
+- `prReviewer.providers.jira.credential.passwordRef`
+- `prReviewer.providers.confluence.domain`
+- `prReviewer.providers.confluence.credential.mode`
+- `prReviewer.providers.confluence.credential.tokenRef`
+- `prReviewer.providers.useDemoData`
+- `prReviewer.providers.disableTlsValidation`
 
-Credential config shape:
+### Runtime Switches
 
-- `mode`: `none | pat | oauth | basic | vscodeAuth`
-- `tokenRef`: secret key name for token-like credentials
-- `usernameRef`: secret key name for basic auth username
-- `passwordRef`: secret key name for basic auth password
+- `prReviewer.llm.mode` (`copilot` or `mock`)
+- `prReviewer.post.enabled`
+- `prReviewer.post.requireConfirmation`
+- `prReviewer.resilience.continueOnConfluenceError`
+- `prReviewer.observability.enabled`
 
-Stage-3 runtime config:
+### What Each `prReviewer` Setting Means
 
-- `llm.mode`: `copilot | mock`
-- `post.enabled`: `true | false`
-- `post.requireConfirmation`: `true | false`
-- `resilience.continueOnConfluenceError`: `true | false`
-- `observability.enabled`: `true | false`
+| Setting | Meaning | Default |
+| --- | --- | --- |
+| `prReviewer.providers.github.domain` | GitHub API base URL used in real-provider mode. | `https://api.github.com` |
+| `prReviewer.providers.github.credential.mode` | Auth mode for GitHub (`none/pat/oauth/basic/vscodeAuth`). | `none` |
+| `prReviewer.providers.github.credential.tokenRef` | Env var key name for GitHub token when mode is `pat` or `oauth`. | `""` |
+| `prReviewer.providers.jira.domain` | Jira base URL used in real-provider mode. | `https://your-domain.atlassian.net` |
+| `prReviewer.providers.jira.credential.mode` | Auth mode for Jira (`none/pat/oauth/basic/vscodeAuth`). | `none` |
+| `prReviewer.providers.jira.credential.tokenRef` | Env var key name for Jira token when mode is `pat` or `oauth`. | `""` |
+| `prReviewer.providers.jira.credential.usernameRef` | Env var key name for Jira username when mode is `basic`. | `""` |
+| `prReviewer.providers.jira.credential.passwordRef` | Env var key name for Jira password when mode is `basic`. | `""` |
+| `prReviewer.providers.confluence.domain` | Confluence base URL used in real-provider mode. | `https://your-domain.atlassian.net/wiki` |
+| `prReviewer.providers.confluence.credential.mode` | Auth mode for Confluence (`none/pat/oauth/basic/vscodeAuth`). | `none` |
+| `prReviewer.providers.confluence.credential.tokenRef` | Env var key name for Confluence token when mode is `pat` or `oauth`. | `""` |
+| `prReviewer.providers.useDemoData` | `true`: use demo providers; `false`: use real HTTP providers. | `true` |
+| `prReviewer.providers.disableTlsValidation` | Disable HTTPS certificate validation for real providers. Use only in trusted internal environments. | `false` |
+| `prReviewer.llm.mode` | LLM execution mode for scoring/drafting (`copilot` or `mock`). | `copilot` |
+| `prReviewer.post.enabled` | Enable/disable publishing comments back to PR. | `true` |
+| `prReviewer.post.requireConfirmation` | Require explicit confirmation before publish. | `true` |
+| `prReviewer.resilience.continueOnConfluenceError` | Continue pipeline with warning when Confluence retrieval fails. | `true` |
+| `prReviewer.observability.enabled` | Emit pipeline/step observability events. | `true` |
 
-Example:
+Notes:
 
-```ts
-const orchestrator = new Stage1ReviewOrchestrator({
-  githubProvider,
-  jiraProvider,
-  confluenceProvider,
-  config: {
-    providers: {
-      github: {
-        domain: "https://api.github.com",
-        credential: { mode: "pat", tokenRef: "github_pat" }
-      },
-      jira: {
-        domain: "https://acme.atlassian.net",
-        credential: { mode: "basic", usernameRef: "jira_user", passwordRef: "jira_pass" }
-      },
-      confluence: {
-        domain: "https://acme.atlassian.net/wiki",
-        credential: { mode: "oauth", tokenRef: "confluence_oauth" }
-      }
-    },
-    llm: {
-      mode: "copilot"
-    },
-    post: {
-      enabled: true,
-      requireConfirmation: true
-    },
-    resilience: {
-      continueOnConfluenceError: true
-    },
-    observability: {
-      enabled: true
-    }
-  }
-});
-```
+- `tokenRef/usernameRef/passwordRef` currently resolve from environment variables whose names equal the `*Ref` values.
+- `prReviewer.providers.disableTlsValidation` only affects real-provider mode (`prReviewer.providers.useDemoData=false`).
 
-## Preparation
+### Credential Modes
 
-Before running with real providers in VS Code extension host, prepare:
+- `none`
+- `pat`
+- `oauth`
+- `basic`
+- `vscodeAuth`
 
-1. VS Code extension runtime (for reading `workspace.getConfiguration`).
-2. Workspace settings with provider domain and credential fields.
-3. Recommended: store secrets in `SecretStorage`, then put secret keys (`tokenRef/usernameRef/passwordRef`) in settings.
-4. Optional for local debugging only: set plain `token/username/password` in settings.
-
-Settings example (`.vscode/settings.json`):
+### Example `.vscode/settings.json`
 
 ```json
 {
@@ -130,7 +166,9 @@ Settings example (`.vscode/settings.json`):
 
   "prReviewer.providers.confluence.domain": "https://acme.atlassian.net/wiki",
   "prReviewer.providers.confluence.credential.mode": "oauth",
-  "prReviewer.providers.confluence.credential.tokenRef": "confluence_oauth",
+  "prReviewer.providers.confluence.credential.tokenRef": "confluence_token",
+  "prReviewer.providers.useDemoData": true,
+  "prReviewer.providers.disableTlsValidation": false,
 
   "prReviewer.llm.mode": "copilot",
   "prReviewer.post.enabled": true,
@@ -140,35 +178,52 @@ Settings example (`.vscode/settings.json`):
 }
 ```
 
-Prompt template hot reload (for local prompt editing):
+## Prompt Templates and Hot Reload
+
+Templates:
+
+- `src/llm/templates/score.md`
+- `src/llm/templates/draft.md`
+
+Hot reload environment variables:
 
 - `PR_REVIEWER_PROMPT_HOT_RELOAD=true`
-- optional `PR_REVIEWER_PROMPT_TEMPLATE_DIR=<absolute-path-to-templates>`
+- Optional: `PR_REVIEWER_PROMPT_TEMPLATE_DIR=<absolute-template-dir>`
 
-Load config patch from VS Code settings:
+## Test Coverage
 
-```ts
-import { loadStage1ConfigPatchFromVsCodeSettings, Stage1ReviewOrchestrator } from "./src/index.js";
+Current tests cover:
 
-const settingsPatch = await loadStage1ConfigPatchFromVsCodeSettings("prReviewer");
-const orchestrator = new Stage1ReviewOrchestrator({
-  githubProvider,
-  jiraProvider,
-  confluenceProvider,
-  config: settingsPatch
-});
-```
+- PR URL parsing
+- Jira key extraction
+- Confluence retrieval and aggregation
+- scoring and draft generation
+- publish confirmation and publish behavior
+- orchestrator end-to-end flow with mocks
+- panel message routing and webview markup
+- VS Code settings -> config patch mapping
 
-Publish edited comment:
+## Main Entry Points
 
-```ts
-const publishResult = await orchestrator.publishEditedComment({
-  prLink: "https://github.com/acme/platform/pull/42",
-  commentBody: "Edited markdown by human reviewer",
-  confirmed: true
-});
-```
+- Extension activation: `src/extension/extension.ts`
+- Panel provider: `src/extension/panelProvider.ts`
+- Panel message routing: `src/extension/panelMessageRouter.ts`
+- Orchestrator: `src/orchestrator/reviewOrchestrator.ts`
+- Copilot provider: `src/llm/copilotLlmProvider.ts`
 
-## What is intentionally deferred to stage 4+
+## Known Boundaries
 
-- Full VS Code webview/panel rendering and UX wiring
+- `prReviewer.providers.useDemoData=true` uses static demo data.
+- `prReviewer.providers.useDemoData=false` uses HTTP APIs and requires valid domains/credentials.
+- `prReviewer.providers.disableTlsValidation=true` disables HTTPS certificate validation in real-provider mode (use only in trusted internal environments).
+- Credential `*Ref` values are resolved from environment variables in current implementation.
+- For real environments, credentials should be stored in VS Code SecretStorage; direct credential fields are best for local/debug usage only.
+
+## Related Documents
+
+- `requirement/requirement.md`
+- `requirement/plan.md`
+- `requirement/stage1-delivery.md`
+- `requirement/stage2-delivery.md`
+- `requirement/stage3-delivery.md`
+- `requirement/stage4-delivery.md`

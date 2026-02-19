@@ -3,13 +3,167 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Stage 1 delivery: PR -> Jira -> Score -> Draft pipeline",
+  "main": "./dist/src/extension/extension.js",
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "activationEvents": [
+    "onView:prReviewer.panel",
+    "onCommand:prReviewer.openPanel"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "prReviewer",
+          "title": "PR Reviewer",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "prReviewer": [
+        {
+          "id": "prReviewer.panel",
+          "name": "PR Reviewer"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "prReviewer.openPanel",
+        "title": "PR Reviewer: Focus Panel"
+      }
+    ],
+    "configuration": {
+      "title": "PR Reviewer",
+      "properties": {
+        "prReviewer.providers.github.domain": {
+          "type": "string",
+          "default": "https://api.github.com",
+          "description": "GitHub API domain."
+        },
+        "prReviewer.providers.github.credential.mode": {
+          "type": "string",
+          "enum": [
+            "none",
+            "pat",
+            "oauth",
+            "basic",
+            "vscodeAuth"
+          ],
+          "default": "none",
+          "description": "GitHub credential mode."
+        },
+        "prReviewer.providers.github.credential.tokenRef": {
+          "type": "string",
+          "default": "",
+          "description": "Secret key reference for GitHub token."
+        },
+        "prReviewer.providers.jira.domain": {
+          "type": "string",
+          "default": "https://your-domain.atlassian.net",
+          "description": "Jira domain."
+        },
+        "prReviewer.providers.jira.credential.mode": {
+          "type": "string",
+          "enum": [
+            "none",
+            "pat",
+            "oauth",
+            "basic",
+            "vscodeAuth"
+          ],
+          "default": "none",
+          "description": "Jira credential mode."
+        },
+        "prReviewer.providers.jira.credential.tokenRef": {
+          "type": "string",
+          "default": "",
+          "description": "Secret key reference for Jira token."
+        },
+        "prReviewer.providers.jira.credential.usernameRef": {
+          "type": "string",
+          "default": "",
+          "description": "Secret key reference for Jira username."
+        },
+        "prReviewer.providers.jira.credential.passwordRef": {
+          "type": "string",
+          "default": "",
+          "description": "Secret key reference for Jira password."
+        },
+        "prReviewer.providers.confluence.domain": {
+          "type": "string",
+          "default": "https://your-domain.atlassian.net/wiki",
+          "description": "Confluence domain."
+        },
+        "prReviewer.providers.confluence.credential.mode": {
+          "type": "string",
+          "enum": [
+            "none",
+            "pat",
+            "oauth",
+            "basic",
+            "vscodeAuth"
+          ],
+          "default": "none",
+          "description": "Confluence credential mode."
+        },
+        "prReviewer.providers.confluence.credential.tokenRef": {
+          "type": "string",
+          "default": "",
+          "description": "Secret key reference for Confluence token."
+        },
+        "prReviewer.providers.useDemoData": {
+          "type": "boolean",
+          "default": true,
+          "description": "Use built-in demo providers for panel runtime."
+        },
+        "prReviewer.providers.disableTlsValidation": {
+          "type": "boolean",
+          "default": false,
+          "description": "Disable TLS certificate validation for HTTPS requests in real provider mode."
+        },
+        "prReviewer.post.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable publish flow."
+        },
+        "prReviewer.post.requireConfirmation": {
+          "type": "boolean",
+          "default": true,
+          "description": "Require publish confirmation."
+        },
+        "prReviewer.llm.mode": {
+          "type": "string",
+          "enum": [
+            "copilot",
+            "mock"
+          ],
+          "default": "copilot",
+          "description": "LLM execution mode."
+        },
+        "prReviewer.resilience.continueOnConfluenceError": {
+          "type": "boolean",
+          "default": true,
+          "description": "Continue review when Confluence retrieval fails."
+        },
+        "prReviewer.observability.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Emit observability events."
+        }
+      }
+    }
+  },
+  "description": "Stage 4 delivery: Full VS Code panel wiring for PR review pipeline",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "node --test --loader ts-node/esm tests/**/*.test.ts"
   },
   "devDependencies": {
     "@types/node": "^22.13.4",
+    "@types/vscode": "^1.96.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.3"
   }

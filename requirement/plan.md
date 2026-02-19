@@ -1,41 +1,51 @@
-1. 目标与边界
+﻿# Implementation Plan
 
-输入最小化：用户只需提供 PR link，其他上下文自动拉取。
-审计闭环：从“上下文聚合”到“评分”再到“可编辑发布”全链路完成。
-可持续扩展：新增数据源、评分维度、审计策略时，不改主流程骨架。
-2. 总体架构设计
+## 1. Goals and Boundaries
 
-views：只负责展示状态、接收用户输入、展示草稿和发布确认。
-orchestrator：唯一流程调度层，串联所有技能并处理失败分支。
-skills：按能力拆分成独立步骤，保证可替换、可单测、可复用。
-providers：统一封装 GitHub/Jira/Confluence 访问，隔离外部系统差异。
-llm：统一 LLM 门面，优先 Copilot，不可用时自动降级。
-config + security：参数集中管理，敏感信息统一 SecretStorage。
-3. 端到端业务流程（无代码版）
+- Minimize user input: only PR link is mandatory.
+- Close the loop: context aggregation -> scoring -> editable publishing.
+- Keep architecture extensible for new providers and review dimensions.
 
-用户输入 PR link 和可选 profile/keywords。
-解析并校验 PR link，不合法直接终止并提示。
-拉取 GitHub PR 元数据、变更、提交、CI、评论，并进行裁剪标记。
-从 commit message 强制提取 Jira key；再拉 Jira issue 及关联层级。
-根据 Jira 和 PR 文本关联 Confluence，按“强关联→弱关联→扩展”检索。
-聚合上下文并做去重、相关性排序、topK 截断，形成统一审计上下文。
-基于 profile 和权重规则生成评分、证据、置信度。
-生成结构化 Markdown 草稿，用户可编辑后再发布。
-发布前二次确认，发布后回显结果与状态。
-4. 关键设计讲解
+## 2. System Design
 
-技能流水线化：每个技能只做一件事，便于替换和回归测试。
-追溯性优先：评分结论必须绑定证据来源，保证可解释。
-人在回路：LLM 负责分析和草稿，最终发布权在用户。
-配置驱动：检索深度、裁剪阈值、评分权重都可通过设置调整。
-降级策略：Copilot不可用时切到 external/mock，保证流程不中断。
-5. 质量与验收方案
+- `views`: receive user input, display status/output, send panel events
+- `orchestrator`: single workflow coordinator
+- `skills`: independent, replaceable processing units
+- `providers`: external data adapters (GitHub/Jira/Confluence)
+- `llm`: model access abstraction
+- `config` + `security`: runtime settings and secret references
 
-单元测试聚焦：链接解析、Jira提取、上下文裁剪、相关性排序、评分计算、草稿发布链路。
-编排测试聚焦：mock providers + mock llm 的端到端稳定性验证。
-MVP 验收对齐文档：可执行、可关联、可评分、可编辑发布、可测试通过、Copilot 可调用。
-6. 交付节奏建议
+## 3. End-to-End Workflow
 
-第一阶段：打通最小链路（PR→Jira→评分→草稿）。
-第二阶段：补齐 Confluence 扩展检索与相关性优化。
-第三阶段：完善发布体验、异常降级、测试覆盖与可观测性。
+1. User enters PR link (+ optional profile/keywords).
+2. Validate and parse PR link.
+3. Fetch GitHub context and trim large patches.
+4. Extract Jira keys from commit messages.
+5. Fetch Jira issue context.
+6. Fetch Confluence context by strong links first, then query expansion.
+7. Aggregate and rank context, build traceability map.
+8. Request LLM scoring/evaluation.
+9. Generate markdown draft.
+10. User edits and confirms publishing.
+
+## 4. Key Technical Decisions
+
+- Skills pipeline for composability and testability.
+- Traceability-first output (Jira -> Confluence mapping).
+- Human confirmation gate for publishing.
+- Config-driven thresholds and scoring weights.
+- Resilience mode for optional Confluence degradation.
+
+## 5. Quality and Validation Strategy
+
+- Unit tests for parser, extraction, aggregation, scoring, publish logic.
+- Orchestrator flow tests with mock providers and mock LLM.
+- Prompt template tests and hot-reload tests.
+- Stage-by-stage delivery docs for incremental acceptance.
+
+## 6. Delivery Stages
+
+- Stage 1: PR -> Jira -> score -> draft
+- Stage 2: Confluence retrieval and relevance ranking
+- Stage 3: publish flow, resilience, observability
+- Stage 4: VS Code panel and message wiring

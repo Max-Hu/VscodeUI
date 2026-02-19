@@ -1,38 +1,38 @@
-# 第二阶段交付说明（Confluence 扩展检索与相关性优化）
+﻿# Stage 2 Delivery (Confluence Retrieval and Relevance Optimization)
 
-## 已交付能力
+## Delivered
 
-1. 新增 `fetch-confluence-context` 技能：
-- 强关联优先：Jira issue links + PR 文本 Confluence links
-- 弱关联扩展：Jira key / summary / AC 与关键词查询
-- 去重输出 Confluence 页面集合
+1. New `fetch-confluence-context` skill:
+- strong-link retrieval first (Jira issue links + PR links)
+- query expansion fallback (Jira keys, summaries, AC, keywords)
+- deduplicated page set
 
-2. 升级 `aggregate-context` 技能：
-- Confluence 页面 relevanceScore 计算
-- 按相关性排序并按 `topK` 截断
-- 生成 Jira -> Confluence traceability 映射
+2. Upgraded `aggregate-context` skill:
+- Confluence page relevance scoring
+- sorting and truncation by `topK`
+- Jira -> Confluence traceability mapping
 
-3. 升级评分与草稿：
-- Traceability 维度纳入 Confluence 覆盖信号
-- 草稿新增 Confluence Context 与 Jira->Confluence Mapping
+3. Scoring and draft upgrades:
+- traceability dimension now reflects Confluence coverage
+- draft now includes Confluence context and mapping sections
 
-4. 配置扩展：
-- 增加 `providers.confluence.domain`
-- 增加 `providers.confluence.credential.*`
-- 支持从 VS Code settings 读取 Confluence 配置
+4. Config extension:
+- `providers.confluence.domain`
+- `providers.confluence.credential.*`
+- VS Code settings mapping for Confluence fields
 
-## 代码位置
+## Main Code Locations
 
-- Provider 抽象：`src/providers/confluenceProvider.ts`
-- Confluence Mock：`src/providers/mocks/mockConfluenceProvider.ts`
-- Confluence 技能：`src/skills/fetchConfluenceContextSkill.ts`
-- 聚合优化：`src/skills/aggregateContextSkill.ts`
-- 编排升级：`src/orchestrator/reviewOrchestrator.ts`
-- 配置读取：`src/config/vscodeSettings.ts`
+- Confluence provider contract: `src/providers/confluenceProvider.ts`
+- Confluence mock provider: `src/providers/mocks/mockConfluenceProvider.ts`
+- Confluence skill: `src/skills/fetchConfluenceContextSkill.ts`
+- Aggregation updates: `src/skills/aggregateContextSkill.ts`
+- Orchestrator updates: `src/orchestrator/reviewOrchestrator.ts`
+- VS Code settings mapping: `src/config/vscodeSettings.ts`
 
-## 新增测试
+## Added Tests
 
 - `tests/fetchConfluenceContextSkill.test.ts`
 - `tests/aggregateContextSkill.test.ts`
-- `tests/reviewOrchestrator.test.ts`（升级为包含 Confluence 链路）
-- `tests/vscodeSettings.test.ts`（覆盖 Confluence 配置映射）
+- `tests/reviewOrchestrator.test.ts` (Confluence path)
+- `tests/vscodeSettings.test.ts` (Confluence config mapping)
