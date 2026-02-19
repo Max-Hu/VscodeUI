@@ -71,6 +71,43 @@ const orchestrator = new Stage1ReviewOrchestrator({
 });
 ```
 
+## Preparation
+
+Before running with real providers in VS Code extension host, prepare:
+
+1. VS Code extension runtime (for reading `workspace.getConfiguration`).
+2. Workspace settings with provider domain and credential fields.
+3. Recommended: store secrets in `SecretStorage`, then put secret keys (`tokenRef/usernameRef/passwordRef`) in settings.
+4. Optional for local debugging only: set plain `token/username/password` in settings.
+
+Settings example (`.vscode/settings.json`):
+
+```json
+{
+  "prReviewer.providers.github.domain": "https://api.github.com",
+  "prReviewer.providers.github.credential.mode": "pat",
+  "prReviewer.providers.github.credential.tokenRef": "github_pat",
+
+  "prReviewer.providers.jira.domain": "https://acme.atlassian.net",
+  "prReviewer.providers.jira.credential.mode": "basic",
+  "prReviewer.providers.jira.credential.usernameRef": "jira_user",
+  "prReviewer.providers.jira.credential.passwordRef": "jira_pass"
+}
+```
+
+Load config patch from VS Code settings:
+
+```ts
+import { loadStage1ConfigPatchFromVsCodeSettings, Stage1ReviewOrchestrator } from "./src/index.js";
+
+const settingsPatch = await loadStage1ConfigPatchFromVsCodeSettings("prReviewer");
+const orchestrator = new Stage1ReviewOrchestrator({
+  githubProvider,
+  jiraProvider,
+  config: settingsPatch
+});
+```
+
 ## What is intentionally deferred to stage 2/3
 
 - Confluence retrieval and relevance-ranking optimization

@@ -1,5 +1,6 @@
 export * from "./config/defaults.js";
 export * from "./config/types.js";
+export * from "./config/vscodeSettings.js";
 export * from "./domain/types.js";
 export * from "./llm/llmProvider.js";
 export * from "./orchestrator/reviewOrchestrator.js";

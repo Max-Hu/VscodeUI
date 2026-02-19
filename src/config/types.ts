@@ -7,6 +7,9 @@ export interface ProviderCredentialConfig {
   tokenRef?: string;
   usernameRef?: string;
   passwordRef?: string;
+  token?: string;
+  username?: string;
+  password?: string;
 }
 
 export interface ProviderConnectionConfig {
