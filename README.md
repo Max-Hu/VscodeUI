@@ -87,6 +87,85 @@ npm test
 - Open the `PR Reviewer` activity-bar view.
 - Run review with a PR link, edit the draft, and publish.
 
+## Package, Install, and Use
+
+### 1. Prerequisites
+
+- VS Code `>= 1.96.0`
+- Node.js `>= 20` (recommended)
+- For `llm.mode=copilot`: active GitHub Copilot in VS Code
+- For packaging: `@vscode/vsce`
+
+### 2. Prepare for Packaging
+
+1. Ensure dependencies are installed:
+
+```bash
+npm install
+```
+
+2. Build the extension:
+
+```bash
+npm run build
+```
+
+3. Ensure `package.json` contains valid extension metadata for packaging (especially `publisher`).
+
+### 3. Build a VSIX Package
+
+Use one of the following:
+
+```bash
+npx @vscode/vsce package --out pr-reviewer.vsix
+```
+
+or
+
+```bash
+vsce package --out pr-reviewer.vsix
+```
+
+The output file (for example `pr-reviewer.vsix`) is your installable package.
+
+### 4. Install the VSIX
+
+Option A: VS Code UI
+
+1. Open Extensions view.
+2. Click `...` (top-right menu).
+3. Select `Install from VSIX...`.
+4. Choose `pr-reviewer.vsix`.
+
+Option B: Command line
+
+```bash
+code --install-extension pr-reviewer.vsix --force
+```
+
+### 5. Configure and Use
+
+1. Open workspace settings (`.vscode/settings.json`).
+2. For demo mode, set `prReviewer.providers.useDemoData=true`.
+3. For real mode, set `prReviewer.providers.useDemoData=false`.
+4. If real mode is used, configure provider domain and credentials.
+5. If you use `tokenRef/usernameRef/passwordRef`, set matching environment variables before launching VS Code.
+6. Open `PR Reviewer` from the activity bar.
+7. Enter PR link, run review, edit draft, publish.
+
+### 6. Optional: Internal TLS Environments
+
+If your internal endpoints use self-signed certificates, you can disable TLS certificate validation in real-provider mode:
+
+```json
+{
+  "prReviewer.providers.useDemoData": false,
+  "prReviewer.providers.disableTlsValidation": true
+}
+```
+
+Use this only in trusted environments.
+
 ## Configuration
 
 All settings are under `prReviewer.*`.
