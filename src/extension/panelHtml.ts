@@ -103,10 +103,38 @@ export function getPanelHtml(nonce: string): string {
     }
     .progress-line {
       color: var(--muted);
-      margin-bottom: 4px;
+      margin-bottom: 6px;
+      padding: 6px 8px;
+      border-left: 3px solid transparent;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.02);
     }
     .progress-line:last-child {
       margin-bottom: 0;
+    }
+    .progress-line.tone-info {
+      border-left-color: #64748b;
+      color: #cbd5e1;
+    }
+    .progress-line.tone-step {
+      border-left-color: #38bdf8;
+      color: #bae6fd;
+    }
+    .progress-line.tone-success {
+      border-left-color: #22c55e;
+      color: #bbf7d0;
+    }
+    .progress-line.tone-warn {
+      border-left-color: #f59e0b;
+      color: #fde68a;
+    }
+    .progress-line.tone-error {
+      border-left-color: #ef4444;
+      color: #fecaca;
+    }
+    .progress-line.tone-llm {
+      border-left-color: #06b6d4;
+      color: #cffafe;
     }
   </style>
 </head>
@@ -159,11 +187,12 @@ export function getPanelHtml(nonce: string): string {
       state.progressLines = 0;
     }
 
-    function appendProgress(text) {
+    function appendProgress(text, tone) {
       if (!text) return;
       const line = document.createElement("div");
-      line.className = "progress-line";
-      line.textContent = text;
+      line.className = "progress-line tone-" + (tone || "info");
+      const stamp = new Date().toLocaleTimeString("en-US", { hour12: false });
+      line.textContent = "[" + stamp + "] " + text;
       els.progress.appendChild(line);
       state.progressLines += 1;
 
@@ -192,12 +221,30 @@ export function getPanelHtml(nonce: string): string {
       return fallbackText || "progress";
     }
 
+    function toneFromEvent(event) {
+      if (!event || typeof event !== "object") {
+        return "info";
+      }
+      if (event.name === "step_started") return "step";
+      if (event.name === "step_succeeded") return "success";
+      if (event.name === "pipeline_completed") return "success";
+      if (event.name === "review-completed") return "success";
+      if (event.name === "publish-completed") return "success";
+      if (event.name === "degraded") return "warn";
+      if (event.name === "step_failed") return "error";
+      if (event.name === "pipeline_failed") return "error";
+      if (event.name === "review-failed") return "error";
+      if (event.name === "llm_prompt" || event.name === "llm_response") return "llm";
+      if (event.name === "llm_error") return "error";
+      return "info";
+    }
+
     function runReview() {
       const prLink = (els.prLink.value || "").trim();
       state.prLink = prLink;
       state.canPublish = false;
       clearProgress();
-      appendProgress("Starting review request...");
+      appendProgress("Starting review request...", "info");
       setStatus("Running review...", "");
       vscode.postMessage({
         type: "start-review",
@@ -207,10 +254,12 @@ export function getPanelHtml(nonce: string): string {
 
     function publish() {
       if (!state.prLink) {
+        appendProgress("Run review first.", "error");
         setStatus("Run review first.", "error");
         return;
       }
       if (!state.canPublish) {
+        appendProgress("No draft available to publish.", "error");
         setStatus("No draft available to publish.", "error");
         return;
       }
@@ -218,6 +267,7 @@ export function getPanelHtml(nonce: string): string {
       if (!confirmed) {
         return;
       }
+      appendProgress("Publishing edited comment...", "step");
       setStatus("Publishing comment...", "");
       vscode.postMessage({
         type: "publish-review",
@@ -240,17 +290,21 @@ export function getPanelHtml(nonce: string): string {
         state.canPublish = true;
         const markdown = message.payload?.draft?.markdown || "";
         els.draft.value = markdown;
+        appendProgress("Review completed.", "success");
         setStatus("Review completed.", "ok");
       } else if (message.type === "review-progress") {
         const detail = message.payload?.text || "";
         const event = message.payload?.event;
-        appendProgress(detail);
+        appendProgress(detail, toneFromEvent(event));
         setStatus(toProgressSummary(event, detail), "");
       } else if (message.type === "publish-completed") {
+        appendProgress("Published: " + (message.payload?.commentUrl || ""), "success");
         setStatus("Published: " + (message.payload?.commentUrl || ""), "ok");
       } else if (message.type === "review-failed") {
         state.canPublish = false;
-        setStatus(message.payload?.message || "Request failed.", "error");
+        const errorMessage = message.payload?.message || "Request failed.";
+        appendProgress(errorMessage, "error");
+        setStatus(errorMessage, "error");
       }
     });
   </script>
