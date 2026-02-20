@@ -60,3 +60,32 @@ test("ExtractJiraKeysSkill returns deduplicated sorted keys from title, branches
 
   assert.deepEqual(result.jiraKeys, ["PROJ-1", "PROJ-2", "PROJ-3"]);
 });
+
+test("ExtractJiraKeysSkill includes PR comment text in scan scope", async () => {
+  const skill = new ExtractJiraKeysSkill();
+  const result = await skill.run(
+    {
+      githubContext: {
+        metadata: {
+          title: "hotfix",
+          body: "",
+          author: "",
+          baseBranch: "main",
+          headBranch: "feature/no-jira",
+          url: ""
+        },
+        files: [],
+        commits: [{ sha: "1", message: "no ticket mentioned" }],
+        checks: [],
+        comments: [
+          { author: "reviewer-a", body: "Please track with proj-9 before merge." },
+          { author: "reviewer-b", body: "and align to PROJ-10 acceptance criteria." }
+        ],
+        signals: { confluenceLinks: [], keywords: [] }
+      }
+    },
+    context
+  );
+
+  assert.deepEqual(result.jiraKeys, ["PROJ-10", "PROJ-9"]);
+});

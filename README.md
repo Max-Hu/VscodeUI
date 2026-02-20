@@ -22,6 +22,74 @@ It collects context from GitHub, Jira, and Confluence, asks VS Code Copilot to s
 
 `PR Link -> GitHub Context -> Jira Keys -> Jira Context -> Confluence Context -> Aggregate -> Score -> Draft -> Publish`
 
+## Data Collection and Context Strategy
+
+### 1. GitHub Context Collection
+
+- Input starts from a single PR link (`owner/repo/pull/number`).
+- The pipeline fetches PR metadata, changed files, commits, checks, and comments.
+- File patches are trimmed by `maxFiles` and `maxPatchCharsPerFile` to keep prompt size controllable.
+- Basic signals are extracted from PR text and comments:
+  - Confluence-like links
+  - Keywords for later Confluence query expansion
+
+### 2. Jira Key Extraction Strategy
+
+- Jira keys are extracted using configurable regex (`jiraKeyPattern`).
+- Matching is case-insensitive in runtime behavior.
+- Scan scope includes:
+  - PR title
+  - Base branch and head branch
+  - PR comments
+  - Commit messages
+- Results are normalized to uppercase, deduplicated, and sorted.
+- If no key is found, the pipeline fails early for traceability safety.
+
+### 3. Jira Context Collection
+
+- Requested keys are sent to Jira provider with `expandDepth`.
+- The real Jira adapter expands linked issues (parent/subtasks/issue links) up to depth limit.
+- For each issue, normalized fields include:
+  - `key`, `summary`, `description`
+  - `acceptanceCriteria`, `nfr`, `risks`, `testingRequirements`
+  - `links` (from issue text URLs + Jira remote links)
+
+### 4. Confluence Context Collection
+
+- Strong-link retrieval runs first using links from:
+  - Jira issue links
+  - PR-side Confluence links
+- Only Confluence links are accepted for direct retrieval; non-Confluence links are ignored.
+- Direct retrieval resolves page id from URL and fetches page content from Confluence REST API (`body.storage`), then converts HTML to plain text.
+
+### 5. Confluence Query Expansion (Search Completion)
+
+- To improve recall beyond direct links, search queries are generated from:
+  - `jiraContext.requestedKeys`
+  - `jiraContext.issues[].summary`
+  - `jiraContext.issues[].acceptanceCriteria`
+  - GitHub extracted keywords
+- Queries are deduplicated and filtered (`length >= 3`), then limited by `topK`.
+- `searchPages(query)` is executed per query; results are tagged by source (`jira-query` or `keyword-query`).
+- Direct and search results are merged and deduplicated by page url/id.
+
+### 6. Aggregation and Traceability
+
+- Confluence pages are scored for relevance using:
+  - source type boost
+  - strong-link boost
+  - Jira key match count
+  - keyword match count
+- Top-ranked pages are kept (`topK`).
+- Traceability map is built: `jiraKey -> confluenceUrls`.
+- The final normalized review context includes GitHub + Jira + Confluence + traceability.
+
+### 7. Resilience and Observability
+
+- If Confluence retrieval fails and `continueOnConfluenceError=true`, the pipeline degrades gracefully with warnings.
+- Runtime progress emits step-level events and summaries (including key fetched counts and LLM runtime info).
+- Verbose logs can be enabled via `prReviewer.observability.verboseLogs`.
+
 ## Architecture
 
 - `src/extension`: extension activation, panel provider, webview HTML, message routing

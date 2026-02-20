@@ -15,7 +15,7 @@ export class ExtractJiraKeysSkill
   implements Skill<ExtractJiraKeysInput, ExtractJiraKeysOutput, SkillContext>
 {
   id = "extract-jira-keys";
-  description = "Extract Jira keys from PR title, branches, and commit messages with configurable regex.";
+  description = "Extract Jira keys from PR title, branches, comments, and commit messages with configurable regex.";
 
   async run(input: ExtractJiraKeysInput, context: SkillContext): Promise<ExtractJiraKeysOutput> {
     const createPattern = () => new RegExp(context.config.jiraKeyPattern, "gi");
@@ -24,10 +24,13 @@ export class ExtractJiraKeysSkill
       `${input.githubContext.metadata.baseBranch}\n${input.githubContext.metadata.headBranch}`,
       createPattern()
     );
+    const commentKeys = input.githubContext.comments.flatMap((comment) =>
+      extractJiraKeysFromText(comment.body, createPattern())
+    );
     const commitKeys = extractJiraKeysFromCommits(input.githubContext.commits, createPattern());
-    const jiraKeys = [...new Set([...titleKeys, ...branchKeys, ...commitKeys])].sort();
+    const jiraKeys = [...new Set([...titleKeys, ...branchKeys, ...commentKeys, ...commitKeys])].sort();
     if (!jiraKeys.length) {
-      throw new Error("No Jira ID found in PR title, branches, or commit messages.");
+      throw new Error("No Jira ID found in PR title, branches, comments, or commit messages.");
     }
 
     return { jiraKeys };
