@@ -124,3 +124,30 @@ test("Stage1ReviewOrchestrator degrades when confluence fails and resilience ena
   assert.equal(result.context.confluence.pages.length, 0);
   assert.ok(observer.getEvents().some((event) => event.name === "degraded" && event.step === "fetch-confluence-context"));
 });
+
+test("Stage1ReviewOrchestrator uses built-in MockLlmProvider when llm.mode is mock", async () => {
+  const orchestrator = new Stage1ReviewOrchestrator({
+    githubProvider: new MockGithubProvider({
+      "acme/platform#42": fixturePullRequest
+    }),
+    jiraProvider: new MockJiraProvider(fixtureIssues),
+    confluenceProvider: new MockConfluenceProvider({
+      byUrl: {
+        [fixtureConfluencePages[0].url]: fixtureConfluencePages[0]
+      }
+    }),
+    config: {
+      llm: {
+        mode: "mock"
+      }
+    }
+  });
+
+  const result = await orchestrator.run({
+    prLink: "https://github.com/acme/platform/pull/42"
+  });
+
+  assert.ok(result.score.overallScore > 0);
+  assert.match(result.draft.markdown, /Mock PR Review Draft/);
+  assert.equal(result.meta.usedLlm, true);
+});

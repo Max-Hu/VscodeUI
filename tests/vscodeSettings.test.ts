@@ -80,3 +80,29 @@ test("buildStage1ConfigPatchFromFlatSettings ignores unsupported credential mode
     }
   });
 });
+
+test("buildStage1ConfigPatchFromFlatSettings maps llm.useMock and overrides llm.mode", () => {
+  const patch = buildStage1ConfigPatchFromFlatSettings({
+    "llm.mode": "copilot",
+    "llm.useMock": true
+  });
+
+  assert.deepEqual(patch, {
+    llm: {
+      mode: "mock"
+    }
+  });
+});
+
+test("buildStage1ConfigPatchFromFlatSettings maps llm.useMock=false to copilot", () => {
+  const patch = buildStage1ConfigPatchFromFlatSettings({
+    "llm.mode": "mock",
+    "llm.useMock": false
+  });
+
+  assert.deepEqual(patch, {
+    llm: {
+      mode: "copilot"
+    }
+  });
+});

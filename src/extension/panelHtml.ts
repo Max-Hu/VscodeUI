@@ -89,6 +89,25 @@ export function getPanelHtml(nonce: string): string {
     }
     .status.error { color: var(--danger); }
     .status.ok { color: var(--accent); }
+    .progress {
+      max-height: 180px;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #0b1220;
+      padding: 8px;
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.4;
+      white-space: pre-wrap;
+    }
+    .progress-line {
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .progress-line:last-child {
+      margin-bottom: 0;
+    }
   </style>
 </head>
 <body>
@@ -103,6 +122,11 @@ export function getPanelHtml(nonce: string): string {
   </div>
 
   <div class="card">
+    <label for="progress">Runtime Progress</label>
+    <div id="progress" class="progress" aria-live="polite"></div>
+  </div>
+
+  <div class="card">
     <label for="draft">Draft Comment (editable)</label>
     <textarea id="draft" placeholder="Run review to generate draft..."></textarea>
     <div class="row">
@@ -114,24 +138,63 @@ export function getPanelHtml(nonce: string): string {
 
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
-    const state = { prLink: "", canPublish: false };
+    const state = { prLink: "", canPublish: false, progressLines: 0 };
     const els = {
       prLink: document.getElementById("prLink"),
       draft: document.getElementById("draft"),
       reviewBtn: document.getElementById("reviewBtn"),
       publishBtn: document.getElementById("publishBtn"),
+      progress: document.getElementById("progress"),
       status: document.getElementById("status")
     };
+    const maxProgressLines = 200;
 
     function setStatus(text, cls) {
       els.status.textContent = text || "";
       els.status.className = "status" + (cls ? " " + cls : "");
     }
 
+    function clearProgress() {
+      els.progress.textContent = "";
+      state.progressLines = 0;
+    }
+
+    function appendProgress(text) {
+      if (!text) return;
+      const line = document.createElement("div");
+      line.className = "progress-line";
+      line.textContent = text;
+      els.progress.appendChild(line);
+      state.progressLines += 1;
+
+      while (state.progressLines > maxProgressLines && els.progress.firstChild) {
+        els.progress.removeChild(els.progress.firstChild);
+        state.progressLines -= 1;
+      }
+
+      els.progress.scrollTop = els.progress.scrollHeight;
+    }
+
+    function toProgressSummary(event, fallbackText) {
+      if (!event || typeof event !== "object") {
+        return fallbackText || "progress";
+      }
+      if (event.name === "pipeline_started") return "Pipeline started";
+      if (event.name === "pipeline_completed") return "Pipeline completed";
+      if (event.name === "pipeline_failed") return "Pipeline failed";
+      if (event.name === "degraded") return "Pipeline degraded";
+      if (event.name === "step_started") return "Running: " + (event.step || "unknown");
+      if (event.name === "step_succeeded") return "Completed: " + (event.step || "unknown");
+      if (event.name === "step_failed") return "Failed: " + (event.step || "unknown");
+      return fallbackText || "progress";
+    }
+
     function runReview() {
       const prLink = (els.prLink.value || "").trim();
       state.prLink = prLink;
       state.canPublish = false;
+      clearProgress();
+      appendProgress("Starting review request...");
       setStatus("Running review...", "");
       vscode.postMessage({
         type: "start-review",
@@ -175,6 +238,11 @@ export function getPanelHtml(nonce: string): string {
         const markdown = message.payload?.draft?.markdown || "";
         els.draft.value = markdown;
         setStatus("Review completed.", "ok");
+      } else if (message.type === "review-progress") {
+        const detail = message.payload?.text || "";
+        const event = message.payload?.event;
+        appendProgress(detail);
+        setStatus(toProgressSummary(event, detail), "");
       } else if (message.type === "publish-completed") {
         setStatus("Published: " + (message.payload?.commentUrl || ""), "ok");
       } else if (message.type === "review-failed") {

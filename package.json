@@ -144,6 +144,10 @@
           "default": "copilot",
           "description": "LLM execution mode."
         },
+        "prReviewer.llm.useMock": {
+          "type": "boolean",
+          "description": "Quick switch for LLM mode. true=mock, false=copilot. This setting overrides prReviewer.llm.mode when provided."
+        },
         "prReviewer.resilience.continueOnConfluenceError": {
           "type": "boolean",
           "default": true,

@@ -40,6 +40,8 @@ It collects context from GitHub, Jira, and Confluence, asks VS Code Copilot to s
 - Scoring and evaluation are done by Copilot output.
 - Local rule-based scoring fallback is intentionally disabled.
 - `mock` mode is available for testing and local development.
+- You can use `prReviewer.llm.useMock` as a quick boolean switch (`true` -> `mock`, `false` -> `copilot`).
+- In `mock` mode, the extension uses a built-in `MockLlmProvider` and does not require Copilot chat models.
 
 ## Provider Runtime Behavior
 
@@ -86,6 +88,10 @@ npm test
 - Press `F5` to launch the Extension Development Host.
 - Open the `PR Reviewer` activity-bar view.
 - Run review with a PR link, edit the draft, and publish.
+- Use launch profile `Debug PR Reviewer Extension (Copilot)` when `prReviewer.llm.mode=copilot`.
+- Use launch profile `Debug PR Reviewer Extension (Isolated)` with `prReviewer.llm.mode=mock`.
+- During review, the panel shows live progress lines (pipeline and step events).
+- Backend debug logs are written to Output channel `PR Reviewer` (`View -> Output`).
 
 ## Package, Install, and Use
 
@@ -189,6 +195,7 @@ All settings are under `prReviewer.*`.
 ### Runtime Switches
 
 - `prReviewer.llm.mode` (`copilot` or `mock`)
+- `prReviewer.llm.useMock` (`true` -> `mock`, `false` -> `copilot`; overrides `prReviewer.llm.mode` when set)
 - `prReviewer.post.enabled`
 - `prReviewer.post.requireConfirmation`
 - `prReviewer.resilience.continueOnConfluenceError`
@@ -212,6 +219,7 @@ All settings are under `prReviewer.*`.
 | `prReviewer.providers.useDemoData` | `true`: use demo providers; `false`: use real HTTP providers. | `true` |
 | `prReviewer.providers.disableTlsValidation` | Disable HTTPS certificate validation for real providers. Use only in trusted internal environments. | `false` |
 | `prReviewer.llm.mode` | LLM execution mode for scoring/drafting (`copilot` or `mock`). | `copilot` |
+| `prReviewer.llm.useMock` | Quick boolean switch for LLM mode. `true` forces `mock`, `false` forces `copilot`. Overrides `prReviewer.llm.mode` when provided. | unset |
 | `prReviewer.post.enabled` | Enable/disable publishing comments back to PR. | `true` |
 | `prReviewer.post.requireConfirmation` | Require explicit confirmation before publish. | `true` |
 | `prReviewer.resilience.continueOnConfluenceError` | Continue pipeline with warning when Confluence retrieval fails. | `true` |
@@ -250,6 +258,7 @@ Notes:
   "prReviewer.providers.disableTlsValidation": false,
 
   "prReviewer.llm.mode": "copilot",
+  "prReviewer.llm.useMock": false,
   "prReviewer.post.enabled": true,
   "prReviewer.post.requireConfirmation": true,
   "prReviewer.resilience.continueOnConfluenceError": true,
@@ -297,6 +306,15 @@ Current tests cover:
 - `prReviewer.providers.disableTlsValidation=true` disables HTTPS certificate validation in real-provider mode (use only in trusted internal environments).
 - Credential `*Ref` values are resolved from environment variables in current implementation.
 - For real environments, credentials should be stored in VS Code SecretStorage; direct credential fields are best for local/debug usage only.
+
+## Troubleshooting
+
+- Error: `LLM provider is required for score-pr...`
+  - Set `"prReviewer.llm.useMock": true` to force built-in mock LLM, or
+  - Set `"prReviewer.llm.useMock": false` (or `"prReviewer.llm.mode": "copilot"`) and ensure Copilot chat model is available.
+- No logs in Output channel:
+  - Open `View -> Output` in the Extension Development Host window and select channel `PR Reviewer`.
+  - Ensure `"prReviewer.observability.enabled": true` if you want step-by-step pipeline events.
 
 ## Related Documents
 

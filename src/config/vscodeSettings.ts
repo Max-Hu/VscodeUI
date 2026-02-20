@@ -25,7 +25,8 @@ export function buildStage1ConfigPatchFromFlatSettings(settings: FlatSettings): 
     patch.providers = providers;
   }
 
-  const llmMode = asLlmMode(settings["llm.mode"]);
+  const useMockLlm = asBoolean(settings["llm.useMock"]);
+  const llmMode = typeof useMockLlm === "boolean" ? (useMockLlm ? "mock" : "copilot") : asLlmMode(settings["llm.mode"]);
   if (llmMode) {
     patch.llm = {
       mode: llmMode
@@ -101,6 +102,7 @@ export async function loadStage1ConfigPatchFromVsCodeSettings(
     "providers.confluence.credential.token": configuration.get("providers.confluence.credential.token"),
     "providers.confluence.credential.username": configuration.get("providers.confluence.credential.username"),
     "providers.confluence.credential.password": configuration.get("providers.confluence.credential.password"),
+    "llm.useMock": configuration.get("llm.useMock"),
     "llm.mode": configuration.get("llm.mode"),
     "post.enabled": configuration.get("post.enabled"),
     "post.requireConfirmation": configuration.get("post.requireConfirmation"),

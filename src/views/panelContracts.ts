@@ -1,4 +1,5 @@
 import type { Stage1ReviewResult } from "../domain/types.js";
+import type { ReviewEvent } from "../observability/reviewObserver.js";
 
 export interface StartReviewMessage {
   type: "start-review";
@@ -35,5 +36,13 @@ export interface ReviewFailedMessage {
   };
 }
 
+export interface ReviewProgressMessage {
+  type: "review-progress";
+  payload: {
+    event: ReviewEvent;
+    text: string;
+  };
+}
+
 export type PanelInboundMessage = StartReviewMessage | PublishReviewMessage;
-export type PanelOutboundMessage = ReviewCompletedMessage | PublishCompletedMessage | ReviewFailedMessage;
+export type PanelOutboundMessage = ReviewCompletedMessage | PublishCompletedMessage | ReviewFailedMessage | ReviewProgressMessage;

@@ -2,7 +2,11 @@ import * as vscode from "vscode";
 import { PrReviewerPanelProvider, PR_REVIEWER_VIEW_ID } from "./panelProvider.js";
 
 export function activate(context: vscode.ExtensionContext): void {
-  const panelProvider = new PrReviewerPanelProvider();
+  const outputChannel = vscode.window.createOutputChannel("PR Reviewer");
+  const panelProvider = new PrReviewerPanelProvider(outputChannel);
+  outputChannel.appendLine(`[startup] PR Reviewer activated at ${new Date().toISOString()}`);
+
+  context.subscriptions.push(outputChannel);
 
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(PR_REVIEWER_VIEW_ID, panelProvider, {

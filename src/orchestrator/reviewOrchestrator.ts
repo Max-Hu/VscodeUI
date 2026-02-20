@@ -7,7 +7,7 @@ import type {
   Stage3ReviewResult
 } from "../domain/types.js";
 import { CopilotLlmProvider } from "../llm/copilotLlmProvider.js";
-import type { ILlmProvider } from "../llm/llmProvider.js";
+import { MockLlmProvider, type ILlmProvider } from "../llm/llmProvider.js";
 import { NoopReviewObserver, type IReviewObserver } from "../observability/reviewObserver.js";
 import type { IConfluenceProvider } from "../providers/confluenceProvider.js";
 import type { IGithubProvider } from "../providers/githubProvider.js";
@@ -54,7 +54,9 @@ export class Stage1ReviewOrchestrator {
         jira: deps.jiraProvider,
         confluence: deps.confluenceProvider
       },
-      llm: deps.llmProvider ?? (resolvedConfig.llm.mode === "copilot" ? new CopilotLlmProvider() : undefined)
+      llm:
+        deps.llmProvider ??
+        (resolvedConfig.llm.mode === "copilot" ? new CopilotLlmProvider() : new MockLlmProvider())
     };
   }
 

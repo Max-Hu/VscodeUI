@@ -10,7 +10,9 @@ export class CopilotLlmProvider implements ILlmProvider {
 
     const models = await lm.selectChatModels({ vendor: "copilot" });
     if (!Array.isArray(models) || models.length === 0) {
-      throw new Error("No Copilot chat model is available.");
+      throw new Error(
+        "No Copilot chat model is available. Ensure GitHub Copilot is installed and signed in, and use the non-isolated debug launch profile."
+      );
     }
 
     const model = models[0];
