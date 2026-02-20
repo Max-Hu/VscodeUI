@@ -74,6 +74,12 @@ export function getPanelHtml(nonce: string): string {
       transition: 120ms ease;
     }
     button:hover { border-color: #6b7280; }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      border-color: #4b5563;
+      background: #0b1220;
+    }
     button.primary {
       border-color: #14532d;
       background: linear-gradient(145deg, #166534, #14532d);
@@ -89,6 +95,7 @@ export function getPanelHtml(nonce: string): string {
     }
     .status.error { color: var(--danger); }
     .status.ok { color: var(--accent); }
+    .status.warn { color: #f59e0b; }
     .progress {
       max-height: 180px;
       overflow-y: auto;
@@ -158,7 +165,7 @@ export function getPanelHtml(nonce: string): string {
     <label for="draft">Draft Comment (editable)</label>
     <textarea id="draft" placeholder="Run review to generate draft..."></textarea>
     <div class="row">
-      <button id="publishBtn" class="danger">Publish</button>
+      <button id="publishBtn" class="danger" disabled aria-disabled="true">Publish</button>
     </div>
   </div>
 
@@ -166,7 +173,7 @@ export function getPanelHtml(nonce: string): string {
 
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
-    const state = { prLink: "", canPublish: false, progressLines: 0 };
+    const state = { prLink: "", canPublish: false, publishArmed: false, progressLines: 0 };
     const els = {
       prLink: document.getElementById("prLink"),
       draft: document.getElementById("draft"),
@@ -176,10 +183,27 @@ export function getPanelHtml(nonce: string): string {
       status: document.getElementById("status")
     };
     const maxProgressLines = 200;
+    const publishDefaultLabel = "Publish";
+    const publishConfirmLabel = "Click again to confirm publish";
 
     function setStatus(text, cls) {
       els.status.textContent = text || "";
       els.status.className = "status" + (cls ? " " + cls : "");
+    }
+
+    function setPublishEnabled(enabled) {
+      state.canPublish = Boolean(enabled);
+      if (!state.canPublish) {
+        state.publishArmed = false;
+      }
+      syncPublishButton();
+    }
+
+    function syncPublishButton() {
+      const disabled = !state.canPublish;
+      els.publishBtn.disabled = disabled;
+      els.publishBtn.setAttribute("aria-disabled", String(disabled));
+      els.publishBtn.textContent = state.publishArmed ? publishConfirmLabel : publishDefaultLabel;
     }
 
     function clearProgress() {
@@ -242,7 +266,7 @@ export function getPanelHtml(nonce: string): string {
     function runReview() {
       const prLink = (els.prLink.value || "").trim();
       state.prLink = prLink;
-      state.canPublish = false;
+      setPublishEnabled(false);
       clearProgress();
       appendProgress("Starting review request...", "info");
       setStatus("Running review...", "");
@@ -263,10 +287,16 @@ export function getPanelHtml(nonce: string): string {
         setStatus("No draft available to publish.", "error");
         return;
       }
-      const confirmed = confirm("Publish edited comment to PR?");
-      if (!confirmed) {
+      if (!state.publishArmed) {
+        state.publishArmed = true;
+        syncPublishButton();
+        appendProgress("Publish armed. Click again to confirm.", "warn");
+        setStatus("Click publish again to confirm.", "warn");
         return;
       }
+      state.publishArmed = false;
+      syncPublishButton();
+      setPublishEnabled(false);
       appendProgress("Publishing edited comment...", "step");
       setStatus("Publishing comment...", "");
       vscode.postMessage({
@@ -281,13 +311,19 @@ export function getPanelHtml(nonce: string): string {
 
     els.reviewBtn.addEventListener("click", runReview);
     els.publishBtn.addEventListener("click", publish);
+    els.draft.addEventListener("input", () => {
+      if (state.publishArmed) {
+        state.publishArmed = false;
+        syncPublishButton();
+      }
+    });
 
     window.addEventListener("message", (event) => {
       const message = event.data;
       if (!message || !message.type) return;
 
       if (message.type === "review-completed") {
-        state.canPublish = true;
+        setPublishEnabled(true);
         const markdown = message.payload?.draft?.markdown || "";
         els.draft.value = markdown;
         appendProgress("Review completed.", "success");
@@ -298,15 +334,18 @@ export function getPanelHtml(nonce: string): string {
         appendProgress(detail, toneFromEvent(event));
         setStatus(toProgressSummary(event, detail), "");
       } else if (message.type === "publish-completed") {
+        setPublishEnabled(true);
         appendProgress("Published: " + (message.payload?.commentUrl || ""), "success");
         setStatus("Published: " + (message.payload?.commentUrl || ""), "ok");
       } else if (message.type === "review-failed") {
-        state.canPublish = false;
+        setPublishEnabled(false);
         const errorMessage = message.payload?.message || "Request failed.";
         appendProgress(errorMessage, "error");
         setStatus(errorMessage, "error");
       }
     });
+
+    setPublishEnabled(false);
   </script>
 </body>
 </html>`;
