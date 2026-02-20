@@ -108,3 +108,90 @@ test("FetchConfluenceContextSkill prefers strong links and performs query expans
     1
   );
 });
+
+test("FetchConfluenceContextSkill ignores non-confluence Jira links for direct page fetch", async () => {
+  const capturedUrls: string[][] = [];
+  const context: SkillContext = {
+    config: {
+      ...defaultStage1Config,
+      providers: {
+        ...defaultStage1Config.providers,
+        confluence: {
+          ...defaultStage1Config.providers.confluence,
+          domain: "https://example.atlassian.net/wiki"
+        }
+      }
+    },
+    providers: {
+      github: {
+        async getPullRequest() {
+          throw new Error("not used");
+        },
+        async publishReviewComment() {
+          throw new Error("not used");
+        }
+      },
+      jira: {
+        async getIssues() {
+          throw new Error("not used");
+        }
+      },
+      confluence: {
+        async getPagesByUrls(urls: string[]) {
+          capturedUrls.push(urls);
+          return [];
+        },
+        async searchPages() {
+          return [];
+        }
+      }
+    }
+  };
+
+  const skill = new FetchConfluenceContextSkill();
+  await skill.run(
+    {
+      githubContext: {
+        metadata: {
+          title: "PROJ-999",
+          body: "",
+          author: "alice",
+          baseBranch: "main",
+          headBranch: "feature",
+          url: "https://github.com/acme/platform/pull/42"
+        },
+        files: [],
+        commits: [],
+        checks: [],
+        comments: [],
+        signals: {
+          confluenceLinks: [],
+          keywords: []
+        }
+      },
+      jiraContext: {
+        requestedKeys: ["PROJ-999"],
+        issues: [
+          {
+            key: "PROJ-999",
+            summary: "Mixed links",
+            description: "",
+            acceptanceCriteria: [],
+            nfr: [],
+            risks: [],
+            testingRequirements: [],
+            links: [
+              "https://example.atlassian.net/wiki/spaces/ENG/pages/101",
+              "https://docs.example.com/runbook/incident",
+              "https://github.com/acme/platform/issues/123"
+            ]
+          }
+        ]
+      }
+    },
+    context
+  );
+
+  assert.equal(capturedUrls.length, 1);
+  assert.deepEqual(capturedUrls[0], ["https://example.atlassian.net/wiki/spaces/ENG/pages/101"]);
+});

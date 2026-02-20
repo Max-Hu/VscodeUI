@@ -31,23 +31,23 @@ const context: SkillContext = {
   }
 };
 
-test("ExtractJiraKeysSkill returns deduplicated sorted keys", async () => {
+test("ExtractJiraKeysSkill returns deduplicated sorted keys from title, branches and commits (case-insensitive)", async () => {
   const skill = new ExtractJiraKeysSkill();
   const result = await skill.run(
     {
       githubContext: {
         metadata: {
-          title: "",
+          title: "feat: add fallback for proj-3",
           body: "",
           author: "",
-          baseBranch: "",
-          headBranch: "",
+          baseBranch: "release/proj-1",
+          headBranch: "feature/PROJ-2-hardening",
           url: ""
         },
         files: [],
         commits: [
-          { sha: "1", message: "PROJ-2 fix A" },
-          { sha: "2", message: "proj-2 duplicate lower should not match default regex" },
+          { sha: "1", message: "misc cleanup without jira id" },
+          { sha: "2", message: "proj-2 duplicate lower should still match now" },
           { sha: "3", message: "PROJ-1 add B" }
         ],
         checks: [],
@@ -58,5 +58,5 @@ test("ExtractJiraKeysSkill returns deduplicated sorted keys", async () => {
     context
   );
 
-  assert.deepEqual(result.jiraKeys, ["PROJ-1", "PROJ-2"]);
+  assert.deepEqual(result.jiraKeys, ["PROJ-1", "PROJ-2", "PROJ-3"]);
 });

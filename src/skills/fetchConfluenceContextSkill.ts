@@ -21,7 +21,10 @@ export class FetchConfluenceContextSkill
   async run(input: FetchConfluenceContextInput, context: SkillContext): Promise<FetchConfluenceContextOutput> {
     const issueLinks = input.jiraContext.issues.flatMap((issue) => issue.links ?? []);
     const prLinks = input.githubContext.signals.confluenceLinks;
-    const strongLinkedUrls = uniqueStrings([...issueLinks, ...prLinks].filter(looksLikeUrl));
+    const confluenceDomain = context.config.providers.confluence.domain;
+    const strongLinkedUrls = uniqueStrings(
+      [...issueLinks, ...prLinks].filter((url) => isConfluenceUrl(url, confluenceDomain))
+    );
 
     const directPages = await context.providers.confluence.getPagesByUrls(strongLinkedUrls, {
       expandDepth: context.config.expandDepth
@@ -85,10 +88,29 @@ function dedupePages(pages: ConfluencePageContext[]): ConfluencePageContext[] {
   return deduped;
 }
 
-function looksLikeUrl(value: string): boolean {
+function isConfluenceUrl(value: string, configuredConfluenceDomain: string): boolean {
   try {
     const parsed = new URL(value);
-    return parsed.protocol === "https:" || parsed.protocol === "http:";
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      return false;
+    }
+
+    const normalizedHost = parsed.hostname.toLowerCase();
+    const normalizedPath = parsed.pathname.toLowerCase();
+    const configuredHost = getConfiguredHost(configuredConfluenceDomain);
+    if (configuredHost && normalizedHost === configuredHost) {
+      return true;
+    }
+
+    // Fallback heuristics for mixed environments and partial settings.
+    if (normalizedHost.includes("confluence")) {
+      return true;
+    }
+    if (normalizedPath.includes("/wiki/") || normalizedPath.endsWith("/wiki")) {
+      return true;
+    }
+
+    return false;
   } catch {
     return false;
   }
@@ -96,4 +118,17 @@ function looksLikeUrl(value: string): boolean {
 
 function uniqueStrings(items: string[]): string[] {
   return [...new Set(items.map((item) => item.trim()).filter(Boolean))];
+}
+
+function getConfiguredHost(domain: string): string | undefined {
+  const trimmed = domain.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  try {
+    const parsed = new URL(trimmed.startsWith("http://") || trimmed.startsWith("https://") ? trimmed : `https://${trimmed}`);
+    return parsed.hostname.toLowerCase();
+  } catch {
+    return undefined;
+  }
 }
