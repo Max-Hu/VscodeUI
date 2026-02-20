@@ -5,7 +5,10 @@ export type ReviewEventName =
   | "step_started"
   | "step_succeeded"
   | "step_failed"
-  | "degraded";
+  | "degraded"
+  | "llm_prompt"
+  | "llm_response"
+  | "llm_error";
 
 export interface ReviewEvent {
   name: ReviewEventName;

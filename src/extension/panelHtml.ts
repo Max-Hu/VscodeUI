@@ -183,6 +183,9 @@ export function getPanelHtml(nonce: string): string {
       if (event.name === "pipeline_completed") return "Pipeline completed";
       if (event.name === "pipeline_failed") return "Pipeline failed";
       if (event.name === "degraded") return "Pipeline degraded";
+      if (event.name === "llm_prompt") return "Preparing LLM input: " + (event.step || "unknown");
+      if (event.name === "llm_response") return "Received LLM output: " + (event.step || "unknown");
+      if (event.name === "llm_error") return "LLM failed: " + (event.step || "unknown");
       if (event.name === "step_started") return "Running: " + (event.step || "unknown");
       if (event.name === "step_succeeded") return "Completed: " + (event.step || "unknown");
       if (event.name === "step_failed") return "Failed: " + (event.step || "unknown");

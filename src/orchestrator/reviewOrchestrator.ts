@@ -8,6 +8,7 @@ import type {
 } from "../domain/types.js";
 import { CopilotLlmProvider } from "../llm/copilotLlmProvider.js";
 import { MockLlmProvider, type ILlmProvider } from "../llm/llmProvider.js";
+import { TracingLlmProvider } from "../llm/tracingLlmProvider.js";
 import { NoopReviewObserver, type IReviewObserver } from "../observability/reviewObserver.js";
 import type { IConfluenceProvider } from "../providers/confluenceProvider.js";
 import type { IGithubProvider } from "../providers/githubProvider.js";
@@ -54,6 +55,40 @@ export class Stage1ReviewOrchestrator {
   constructor(deps: ReviewOrchestratorDeps) {
     this.reviewObserver = deps.reviewObserver ?? new NoopReviewObserver();
     const resolvedConfig = mergeConfig(defaultStage1Config, deps.config ?? {});
+    const selectedLlm =
+      deps.llmProvider ??
+      (resolvedConfig.llm.mode === "copilot" ? new CopilotLlmProvider() : new MockLlmProvider());
+    const llm = resolvedConfig.observability.verboseLogs
+      ? new TracingLlmProvider(selectedLlm, {
+          maxPreviewChars: 3000,
+          onPrompt: async ({ operation, promptPreview }) => {
+            await this.safeEmitWithResolvedConfig(resolvedConfig, {
+              name: "llm_prompt",
+              step: operation,
+              message: `chars=${promptPreview.length} | promptPreview=${inline(promptPreview)}`,
+              timestamp: new Date().toISOString()
+            });
+          },
+          onResponse: async ({ operation, outputPreview, durationMs }) => {
+            await this.safeEmitWithResolvedConfig(resolvedConfig, {
+              name: "llm_response",
+              step: operation,
+              durationMs,
+              message: `chars=${outputPreview.length} | outputPreview=${inline(outputPreview)}`,
+              timestamp: new Date().toISOString()
+            });
+          },
+          onError: async ({ operation, durationMs, errorMessage }) => {
+            await this.safeEmitWithResolvedConfig(resolvedConfig, {
+              name: "llm_error",
+              step: operation,
+              durationMs,
+              message: errorMessage,
+              timestamp: new Date().toISOString()
+            });
+          }
+        })
+      : selectedLlm;
     this.context = {
       config: resolvedConfig,
       providers: {
@@ -61,9 +96,7 @@ export class Stage1ReviewOrchestrator {
         jira: deps.jiraProvider,
         confluence: deps.confluenceProvider
       },
-      llm:
-        deps.llmProvider ??
-        (resolvedConfig.llm.mode === "copilot" ? new CopilotLlmProvider() : new MockLlmProvider())
+      llm
     };
   }
 
@@ -249,6 +282,16 @@ export class Stage1ReviewOrchestrator {
     }
     await this.reviewObserver.emit(event);
   }
+
+  private async safeEmitWithResolvedConfig(
+    config: Stage1Config,
+    event: Parameters<IReviewObserver["emit"]>[0]
+  ): Promise<void> {
+    if (!config.observability.enabled) {
+      return;
+    }
+    await this.reviewObserver.emit(event);
+  }
 }
 
 function summarizeGithubFetch(result: FetchGithubContextOutput): string {
@@ -358,6 +401,10 @@ function describeLlm(provider: ILlmProvider | undefined, mode: Stage1Config["llm
     return `${described} | mode=${mode}`;
   }
   return `provider=unknown | mode=${mode}`;
+}
+
+function inline(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
 }
 
 function mergeConfig(base: Stage1Config, partial: Stage1ConfigPatch): Stage1Config {

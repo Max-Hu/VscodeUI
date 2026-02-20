@@ -160,6 +160,7 @@ npm test
 - Use launch profile `Debug PR Reviewer Extension (Isolated)` with `prReviewer.llm.mode=mock`.
 - During review, the panel shows live progress lines (pipeline and step events), including LLM runtime info (provider/mode/model when available).
 - Backend debug logs are written to Output channel `PR Reviewer` (`View -> Output`).
+- With `prReviewer.observability.verboseLogs=true`, prompt/response previews sent to LLM are also logged (truncated for safety).
 
 ## Package, Install, and Use
 
