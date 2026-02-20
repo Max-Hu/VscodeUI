@@ -34,9 +34,16 @@ export class PrReviewerPanelProvider implements vscode.WebviewViewProvider {
   }
 
   private async handleInboundMessage(message: unknown): Promise<void> {
+    const verboseLogs = this.isVerboseLogsEnabled();
+    if (verboseLogs) {
+      this.outputChannel.show(false);
+    }
     const messageType =
       message && typeof message === "object" && "type" in message ? String((message as { type: unknown }).type) : "unknown";
     this.outputChannel.appendLine(`[panel] inbound message received: ${messageType}`);
+    if (verboseLogs) {
+      this.outputChannel.appendLine(`[panel] inbound payload: ${safeStringify(message)}`);
+    }
     const outbound = await routePanelMessage(message, {
       runReview: async (request) => {
         const orchestrator = await this.createOrchestrator();
@@ -50,6 +57,9 @@ export class PrReviewerPanelProvider implements vscode.WebviewViewProvider {
 
     await this.webviewView?.webview.postMessage(outbound);
     this.outputChannel.appendLine(`[panel] outbound message posted: ${outbound.type}`);
+    if (verboseLogs) {
+      this.outputChannel.appendLine(`[panel] outbound payload: ${safeStringify(outbound)}`);
+    }
   }
 
   private async createOrchestrator(): Promise<Stage1ReviewOrchestrator> {
@@ -74,16 +84,23 @@ export class PrReviewerPanelProvider implements vscode.WebviewViewProvider {
     });
     const llmMode = configPatch.llm?.mode ?? "copilot";
     const observabilityEnabled = configPatch.observability?.enabled ?? true;
+    const verboseLogs = configPatch.observability?.verboseLogs ?? false;
     this.outputChannel.appendLine(
-      `[config] useDemoData=${String(useDemoData)} disableTlsValidation=${String(disableTlsValidation)} llm.mode=${llmMode} observability.enabled=${String(observabilityEnabled)}`
+      `[config] useDemoData=${String(useDemoData)} disableTlsValidation=${String(disableTlsValidation)} llm.mode=${llmMode} observability.enabled=${String(observabilityEnabled)} observability.verboseLogs=${String(verboseLogs)}`
     );
     if (!observabilityEnabled) {
       this.outputChannel.appendLine("[pipeline] observability is disabled, progress events will not be emitted.");
+    }
+    if (verboseLogs) {
+      this.outputChannel.appendLine(`[config] effective config patch: ${safeStringify(configPatch)}`);
     }
 
     const reviewObserver = new PanelReviewObserver({
       log: (line) => this.outputChannel.appendLine(`[pipeline] ${line}`),
       onEvent: async (event, formatted) => {
+        if (verboseLogs) {
+          this.outputChannel.appendLine(`[pipeline:event] ${safeStringify(event)}`);
+        }
         await this.postProgressEvent(event, formatted);
       }
     });
@@ -106,5 +123,19 @@ export class PrReviewerPanelProvider implements vscode.WebviewViewProvider {
       }
     };
     await this.webviewView?.webview.postMessage(payload);
+  }
+
+  private isVerboseLogsEnabled(): boolean {
+    return vscode.workspace
+      .getConfiguration(PR_REVIEWER_SETTINGS_SECTION)
+      .get<boolean>("observability.verboseLogs", false);
+  }
+}
+
+function safeStringify(value: unknown): string {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return "[unserializable]";
   }
 }

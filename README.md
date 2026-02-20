@@ -90,7 +90,7 @@ npm test
 - Run review with a PR link, edit the draft, and publish.
 - Use launch profile `Debug PR Reviewer Extension (Copilot)` when `prReviewer.llm.mode=copilot`.
 - Use launch profile `Debug PR Reviewer Extension (Isolated)` with `prReviewer.llm.mode=mock`.
-- During review, the panel shows live progress lines (pipeline and step events).
+- During review, the panel shows live progress lines (pipeline and step events), including LLM runtime info (provider/mode/model when available).
 - Backend debug logs are written to Output channel `PR Reviewer` (`View -> Output`).
 
 ## Package, Install, and Use
@@ -200,6 +200,7 @@ All settings are under `prReviewer.*`.
 - `prReviewer.post.requireConfirmation`
 - `prReviewer.resilience.continueOnConfluenceError`
 - `prReviewer.observability.enabled`
+- `prReviewer.observability.verboseLogs`
 
 ### What Each `prReviewer` Setting Means
 
@@ -224,6 +225,7 @@ All settings are under `prReviewer.*`.
 | `prReviewer.post.requireConfirmation` | Require explicit confirmation before publish. | `true` |
 | `prReviewer.resilience.continueOnConfluenceError` | Continue pipeline with warning when Confluence retrieval fails. | `true` |
 | `prReviewer.observability.enabled` | Emit pipeline/step observability events. | `true` |
+| `prReviewer.observability.verboseLogs` | Print verbose debug logs (inbound/outbound payloads and raw pipeline events) to Output channel `PR Reviewer`. | `false` |
 
 Notes:
 
@@ -262,7 +264,8 @@ Notes:
   "prReviewer.post.enabled": true,
   "prReviewer.post.requireConfirmation": true,
   "prReviewer.resilience.continueOnConfluenceError": true,
-  "prReviewer.observability.enabled": true
+  "prReviewer.observability.enabled": true,
+  "prReviewer.observability.verboseLogs": true
 }
 ```
 
@@ -315,6 +318,7 @@ Current tests cover:
 - No logs in Output channel:
   - Open `View -> Output` in the Extension Development Host window and select channel `PR Reviewer`.
   - Ensure `"prReviewer.observability.enabled": true` if you want step-by-step pipeline events.
+  - Set `"prReviewer.observability.verboseLogs": true` for detailed payload/event logs and auto-open Output panel on request.
 
 ## Related Documents
 

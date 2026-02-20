@@ -151,3 +151,42 @@ test("Stage1ReviewOrchestrator uses built-in MockLlmProvider when llm.mode is mo
   assert.match(result.draft.markdown, /Mock PR Review Draft/);
   assert.equal(result.meta.usedLlm, true);
 });
+
+test("Stage1ReviewOrchestrator emits per-step detail messages for runtime progress", async () => {
+  const observer = new InMemoryReviewObserver();
+  const orchestrator = new Stage1ReviewOrchestrator({
+    githubProvider: new MockGithubProvider({
+      "acme/platform#42": fixturePullRequest
+    }),
+    jiraProvider: new MockJiraProvider(fixtureIssues),
+    confluenceProvider: new MockConfluenceProvider({
+      byUrl: {
+        [fixtureConfluencePages[0].url]: fixtureConfluencePages[0]
+      },
+      byQuery: {
+        PROJ: [fixtureConfluencePages[1]]
+      }
+    }),
+    llmProvider: createLlmForTests(),
+    reviewObserver: observer
+  });
+
+  await orchestrator.run({
+    prLink: "https://github.com/acme/platform/pull/42"
+  });
+
+  const succeededEvents = observer.getEvents().filter((event) => event.name === "step_succeeded");
+  const byStep = new Map(succeededEvents.map((event) => [event.step, event]));
+  const pipelineStarted = observer.getEvents().find((event) => event.name === "pipeline_started");
+
+  assert.match(pipelineStarted?.message ?? "", /llm=/);
+  assert.match(byStep.get("fetch-github-context")?.message ?? "", /files=\d+/);
+  assert.match(byStep.get("extract-jira-keys")?.message ?? "", /extractedKeys=\d+/);
+  assert.match(byStep.get("fetch-jira-context")?.message ?? "", /loadedIssues=\d+/);
+  assert.match(byStep.get("fetch-confluence-context")?.message ?? "", /pages=\d+/);
+  assert.match(byStep.get("aggregate-context")?.message ?? "", /rankedConfluencePages=\d+/);
+  assert.match(byStep.get("score-pr")?.message ?? "", /llm=/);
+  assert.match(byStep.get("score-pr")?.message ?? "", /overallScore=\d+/);
+  assert.match(byStep.get("draft-comment")?.message ?? "", /llm=/);
+  assert.match(byStep.get("draft-comment")?.message ?? "", /draftChars=\d+/);
+});

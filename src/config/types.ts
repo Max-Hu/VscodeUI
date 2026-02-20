@@ -40,6 +40,7 @@ export interface Stage1Config {
   };
   observability: {
     enabled: boolean;
+    verboseLogs: boolean;
   };
   scoring: {
     weights: Record<ScoreDimension, number>;

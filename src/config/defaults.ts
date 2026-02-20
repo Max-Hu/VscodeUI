@@ -37,7 +37,8 @@ export const defaultStage1Config: Stage1Config = {
     continueOnConfluenceError: true
   },
   observability: {
-    enabled: true
+    enabled: true,
+    verboseLogs: false
   },
   scoring: {
     weights: {

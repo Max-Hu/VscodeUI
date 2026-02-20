@@ -18,7 +18,8 @@ test("buildStage1ConfigPatchFromFlatSettings maps github jira and confluence pro
     "post.enabled": true,
     "post.requireConfirmation": true,
     "resilience.continueOnConfluenceError": true,
-    "observability.enabled": false
+    "observability.enabled": false,
+    "observability.verboseLogs": true
   });
 
   assert.deepEqual(patch, {
@@ -57,7 +58,8 @@ test("buildStage1ConfigPatchFromFlatSettings maps github jira and confluence pro
       continueOnConfluenceError: true
     },
     observability: {
-      enabled: false
+      enabled: false,
+      verboseLogs: true
     }
   });
 });

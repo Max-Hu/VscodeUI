@@ -1,9 +1,14 @@
 export interface ILlmProvider {
   generate(prompt: string): Promise<string>;
+  describe?(): string;
 }
 
 export class MockLlmProvider implements ILlmProvider {
   constructor(private readonly response?: string) {}
+
+  describe(): string {
+    return "provider=mock | model=built-in-mock";
+  }
 
   async generate(prompt: string): Promise<string> {
     if (this.response) {

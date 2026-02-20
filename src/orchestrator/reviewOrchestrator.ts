@@ -14,13 +14,20 @@ import type { IGithubProvider } from "../providers/githubProvider.js";
 import type { IJiraProvider } from "../providers/jiraProvider.js";
 import type { SkillContext } from "../skills/context.js";
 import { AggregateContextSkill } from "../skills/aggregateContextSkill.js";
+import type { AggregateContextOutput } from "../skills/aggregateContextSkill.js";
 import { DraftCommentSkill } from "../skills/draftCommentSkill.js";
+import type { DraftCommentOutput } from "../skills/draftCommentSkill.js";
 import { ExtractJiraKeysSkill } from "../skills/extractJiraKeysSkill.js";
+import type { ExtractJiraKeysOutput } from "../skills/extractJiraKeysSkill.js";
 import { FetchConfluenceContextSkill } from "../skills/fetchConfluenceContextSkill.js";
+import type { FetchConfluenceContextOutput } from "../skills/fetchConfluenceContextSkill.js";
 import { FetchGithubContextSkill } from "../skills/fetchGithubContextSkill.js";
+import type { FetchGithubContextOutput } from "../skills/fetchGithubContextSkill.js";
 import { FetchJiraContextSkill } from "../skills/fetchJiraContextSkill.js";
+import type { FetchJiraContextOutput } from "../skills/fetchJiraContextSkill.js";
 import { PublishCommentSkill } from "../skills/publishCommentSkill.js";
 import { ScorePrSkill } from "../skills/scorePrSkill.js";
+import type { ScorePrOutput } from "../skills/scorePrSkill.js";
 import { parsePrLink } from "../utils/parsePrLink.js";
 
 export interface ReviewOrchestratorDeps {
@@ -63,8 +70,10 @@ export class Stage1ReviewOrchestrator {
   async run(request: ReviewRequest): Promise<Stage3ReviewResult> {
     const pipelineStartedAt = Date.now();
     const warnings: string[] = [];
+    const llmRuntime = describeLlm(this.context.llm, this.context.config.llm.mode);
     await this.emit({
       name: "pipeline_started",
+      message: `llm=${llmRuntime}`,
       timestamp: new Date().toISOString()
     });
 
@@ -74,13 +83,16 @@ export class Stage1ReviewOrchestrator {
     // security/performance/compliance together.
     const profile = "default";
     const githubResult = await this.runStep("fetch-github-context", () =>
-      this.fetchGithubContextSkill.run({ request }, this.context)
+      this.fetchGithubContextSkill.run({ request }, this.context),
+      summarizeGithubFetch
     );
     const jiraKeysResult = await this.runStep("extract-jira-keys", () =>
-      this.extractJiraKeysSkill.run({ githubContext: githubResult.githubContext }, this.context)
+      this.extractJiraKeysSkill.run({ githubContext: githubResult.githubContext }, this.context),
+      summarizeJiraKeys
     );
     const jiraResult = await this.runStep("fetch-jira-context", () =>
-      this.fetchJiraContextSkill.run({ jiraKeys: jiraKeysResult.jiraKeys }, this.context)
+      this.fetchJiraContextSkill.run({ jiraKeys: jiraKeysResult.jiraKeys }, this.context),
+      summarizeJiraFetch
     );
 
     let confluenceResult;
@@ -92,7 +104,8 @@ export class Stage1ReviewOrchestrator {
             jiraContext: jiraResult.jira
           },
           this.context
-        )
+        ),
+        summarizeConfluenceFetch
       );
     } catch (error) {
       if (!this.context.config.resilience.continueOnConfluenceError) {
@@ -125,7 +138,8 @@ export class Stage1ReviewOrchestrator {
           confluenceContext: confluenceResult.confluence
         },
         this.context
-      )
+      ),
+      summarizeAggregateContext
     );
     const { reviewContext } = aggregateResult;
 
@@ -138,7 +152,8 @@ export class Stage1ReviewOrchestrator {
           profile: reviewContext.profile
         },
         this.context
-      )
+      ),
+      (result) => summarizeScore(result, llmRuntime)
     );
 
     const draft = await this.runStep("draft-comment", () =>
@@ -148,7 +163,8 @@ export class Stage1ReviewOrchestrator {
           score: score.score
         },
         this.context
-      )
+      ),
+      (result) => summarizeDraft(result, llmRuntime)
     );
 
     const durationMs = Date.now() - pipelineStartedAt;
@@ -193,7 +209,11 @@ export class Stage1ReviewOrchestrator {
     return publish.result;
   }
 
-  private async runStep<T>(step: string, runner: () => Promise<T>): Promise<T> {
+  private async runStep<T>(
+    step: string,
+    runner: () => Promise<T>,
+    describeResult?: (result: T) => string | undefined
+  ): Promise<T> {
     const startedAt = Date.now();
     await this.emit({
       name: "step_started",
@@ -202,9 +222,11 @@ export class Stage1ReviewOrchestrator {
     });
     try {
       const result = await runner();
+      const message = describeResult?.(result);
       await this.emit({
         name: "step_succeeded",
         step,
+        ...(message ? { message } : {}),
         durationMs: Date.now() - startedAt,
         timestamp: new Date().toISOString()
       });
@@ -227,6 +249,115 @@ export class Stage1ReviewOrchestrator {
     }
     await this.reviewObserver.emit(event);
   }
+}
+
+function summarizeGithubFetch(result: FetchGithubContextOutput): string {
+  const metadata = result.githubContext.metadata;
+  const fileCount = result.githubContext.files.length;
+  const commitCount = result.githubContext.commits.length;
+  const checkCount = result.githubContext.checks.length;
+  const commentCount = result.githubContext.comments.length;
+  const keywords = clipList(result.githubContext.signals.keywords, 5);
+  const confluenceLinks = result.githubContext.signals.confluenceLinks.length;
+  return [
+    `PR=${result.prReference.owner}/${result.prReference.repo}#${result.prReference.prNumber}`,
+    `title="${clipText(metadata.title, 60)}"`,
+    `files=${fileCount}`,
+    `commits=${commitCount}`,
+    `checks=${checkCount}`,
+    `comments=${commentCount}`,
+    `confluenceLinks=${confluenceLinks}`,
+    `keywords=${keywords}`
+  ].join(" | ");
+}
+
+function summarizeJiraKeys(result: ExtractJiraKeysOutput): string {
+  return `extractedKeys=${result.jiraKeys.length} | keys=${clipList(result.jiraKeys, 8)}`;
+}
+
+function summarizeJiraFetch(result: FetchJiraContextOutput): string {
+  const issueKeys = result.jira.issues.map((issue) => issue.key);
+  return [
+    `requestedKeys=${result.jira.requestedKeys.length}`,
+    `loadedIssues=${result.jira.issues.length}`,
+    `issueKeys=${clipList(issueKeys, 8)}`
+  ].join(" | ");
+}
+
+function summarizeConfluenceFetch(result: FetchConfluenceContextOutput): string {
+  const sourceCounts = countBySource(result.confluence.pages);
+  const sourceSummary = Object.entries(sourceCounts)
+    .map(([source, count]) => `${source}:${count}`)
+    .join(",");
+  return [
+    `strongLinks=${result.confluence.strongLinkedUrls.length}`,
+    `queries=${result.confluence.searchQueries.length}`,
+    `pages=${result.confluence.pages.length}`,
+    `sources=${sourceSummary || "none"}`
+  ].join(" | ");
+}
+
+function summarizeAggregateContext(result: AggregateContextOutput): string {
+  const pages = result.reviewContext.confluence.pages;
+  const topPages = pages.slice(0, 3).map((page) => page.title);
+  return [
+    `rankedConfluencePages=${pages.length}`,
+    `traceabilityKeys=${Object.keys(result.reviewContext.traceability.jiraToConfluence).length}`,
+    `topPages=${clipList(topPages, 3)}`
+  ].join(" | ");
+}
+
+function summarizeScore(result: ScorePrOutput, llmRuntime: string): string {
+  const weakest = [...result.score.scoreBreakdown].sort((a, b) => a.score - b.score)[0];
+  return [
+    `llm=${llmRuntime}`,
+    `overallScore=${result.score.overallScore}`,
+    `confidence=${result.score.confidence}`,
+    weakest ? `weakest=${weakest.dimension}:${weakest.score}` : undefined
+  ]
+    .filter(Boolean)
+    .join(" | ");
+}
+
+function summarizeDraft(result: DraftCommentOutput, llmRuntime: string): string {
+  const lineCount = result.draft.markdown.split(/\r?\n/).length;
+  return `llm=${llmRuntime} | draftChars=${result.draft.markdown.length} | draftLines=${lineCount} | usedLlm=${String(result.usedLlm)}`;
+}
+
+function clipText(value: string, maxLen: number): string {
+  if (value.length <= maxLen) {
+    return value;
+  }
+  return `${value.slice(0, maxLen - 3)}...`;
+}
+
+function clipList(items: string[], maxItems: number): string {
+  if (items.length === 0) {
+    return "-";
+  }
+  const clipped = items.slice(0, maxItems);
+  const suffix = items.length > maxItems ? ` (+${items.length - maxItems})` : "";
+  return `${clipped.join(",")}${suffix}`;
+}
+
+function countBySource(
+  pages: Array<{
+    source: "issue-link" | "pr-link" | "jira-query" | "keyword-query";
+  }>
+): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const page of pages) {
+    counts[page.source] = (counts[page.source] ?? 0) + 1;
+  }
+  return counts;
+}
+
+function describeLlm(provider: ILlmProvider | undefined, mode: Stage1Config["llm"]["mode"]): string {
+  const described = provider?.describe?.();
+  if (described && described.trim()) {
+    return `${described} | mode=${mode}`;
+  }
+  return `provider=unknown | mode=${mode}`;
 }
 
 function mergeConfig(base: Stage1Config, partial: Stage1ConfigPatch): Stage1Config {

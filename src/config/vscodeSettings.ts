@@ -50,9 +50,11 @@ export function buildStage1ConfigPatchFromFlatSettings(settings: FlatSettings): 
   }
 
   const observabilityEnabled = asBoolean(settings["observability.enabled"]);
-  if (typeof observabilityEnabled === "boolean") {
+  const observabilityVerboseLogs = asBoolean(settings["observability.verboseLogs"]);
+  if (typeof observabilityEnabled === "boolean" || typeof observabilityVerboseLogs === "boolean") {
     patch.observability = {
-      enabled: observabilityEnabled
+      ...(typeof observabilityEnabled === "boolean" ? { enabled: observabilityEnabled } : {}),
+      ...(typeof observabilityVerboseLogs === "boolean" ? { verboseLogs: observabilityVerboseLogs } : {})
     };
   }
 
@@ -107,7 +109,8 @@ export async function loadStage1ConfigPatchFromVsCodeSettings(
     "post.enabled": configuration.get("post.enabled"),
     "post.requireConfirmation": configuration.get("post.requireConfirmation"),
     "resilience.continueOnConfluenceError": configuration.get("resilience.continueOnConfluenceError"),
-    "observability.enabled": configuration.get("observability.enabled")
+    "observability.enabled": configuration.get("observability.enabled"),
+    "observability.verboseLogs": configuration.get("observability.verboseLogs")
   });
 }
 

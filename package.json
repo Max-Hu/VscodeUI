@@ -157,6 +157,11 @@
           "type": "boolean",
           "default": true,
           "description": "Emit observability events."
+        },
+        "prReviewer.observability.verboseLogs": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable verbose debug logs in Output channel, including event payload details."
         }
       }
     }

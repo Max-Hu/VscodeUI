@@ -1,6 +1,12 @@
 import type { ILlmProvider } from "./llmProvider.js";
 
 export class CopilotLlmProvider implements ILlmProvider {
+  private lastModelLabel = "auto";
+
+  describe(): string {
+    return `provider=copilot | model=${this.lastModelLabel}`;
+  }
+
   async generate(prompt: string): Promise<string> {
     const vscode = await loadVsCode();
     const lm = vscode?.lm;
@@ -16,6 +22,7 @@ export class CopilotLlmProvider implements ILlmProvider {
     }
 
     const model = models[0];
+    this.lastModelLabel = toModelLabel(model);
     const message = vscode.LanguageModelChatMessage?.User
       ? vscode.LanguageModelChatMessage.User(prompt)
       : { role: "user", content: prompt };
@@ -66,4 +73,23 @@ function stringifyLmPart(part: unknown): string {
 
 function isAsyncIterable(value: unknown): value is AsyncIterable<unknown> {
   return Boolean(value && typeof (value as AsyncIterable<unknown>)[Symbol.asyncIterator] === "function");
+}
+
+function toModelLabel(model: unknown): string {
+  if (!model || typeof model !== "object") {
+    return "auto";
+  }
+  const candidate = model as Record<string, unknown>;
+  const id = asNonEmptyString(candidate.id);
+  const name = asNonEmptyString(candidate.name);
+  const family = asNonEmptyString(candidate.family);
+  return id ?? name ?? family ?? "auto";
+}
+
+function asNonEmptyString(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length ? trimmed : undefined;
 }
