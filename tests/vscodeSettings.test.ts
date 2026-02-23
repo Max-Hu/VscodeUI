@@ -1,25 +1,44 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildStage1ConfigPatchFromFlatSettings } from "../src/config/vscodeSettings.js";
+import { buildStage1ConfigPatchFromStructuredSettings } from "../src/config/vscodeSettings.js";
 
-test("buildStage1ConfigPatchFromFlatSettings maps github jira and confluence provider settings", () => {
-  const patch = buildStage1ConfigPatchFromFlatSettings({
-    "providers.github.domain": "https://api.github.com",
-    "providers.github.credential.mode": "pat",
-    "providers.github.credential.tokenRef": "github_pat",
-    "providers.jira.domain": "https://acme.atlassian.net",
-    "providers.jira.credential.mode": "basic",
-    "providers.jira.credential.usernameRef": "jira_user",
-    "providers.jira.credential.passwordRef": "jira_pass",
-    "providers.confluence.domain": "https://acme.atlassian.net/wiki",
-    "providers.confluence.credential.mode": "oauth",
-    "providers.confluence.credential.tokenRef": "confluence_token",
-    "llm.mode": "copilot",
-    "post.enabled": true,
-    "post.requireConfirmation": true,
-    "resilience.continueOnConfluenceError": true,
-    "observability.enabled": false,
-    "observability.verboseLogs": true
+test("buildStage1ConfigPatchFromStructuredSettings maps structured providers and runtime switches", () => {
+  const patch = buildStage1ConfigPatchFromStructuredSettings({
+    providers: {
+      github: {
+        domain: "https://api.github.com",
+        credential: {
+          usernameRef: "github_user",
+          passwordRef: "github_pass"
+        }
+      },
+      jira: {
+        domain: "https://acme.atlassian.net",
+        credential: {
+          tokenRef: "jira_token"
+        }
+      },
+      confluence: {
+        domain: "https://acme.atlassian.net/wiki",
+        credential: {
+          tokenRef: "confluence_token"
+        }
+      }
+    },
+    llm: {
+      mode: "copilot"
+    },
+    post: {
+      enabled: true,
+      requireConfirmation: true
+    },
+    resilience: {
+      continueOnConfluenceError: true
+    },
+    observability: {
+      enabled: false,
+      verboseLogs: true
+    }
   });
 
   assert.deepEqual(patch, {
@@ -27,22 +46,19 @@ test("buildStage1ConfigPatchFromFlatSettings maps github jira and confluence pro
       github: {
         domain: "https://api.github.com",
         credential: {
-          mode: "pat",
-          tokenRef: "github_pat"
+          usernameRef: "github_user",
+          passwordRef: "github_pass"
         }
       },
       jira: {
         domain: "https://acme.atlassian.net",
         credential: {
-          mode: "basic",
-          usernameRef: "jira_user",
-          passwordRef: "jira_pass"
+          tokenRef: "jira_token"
         }
       },
       confluence: {
         domain: "https://acme.atlassian.net/wiki",
         credential: {
-          mode: "oauth",
           tokenRef: "confluence_token"
         }
       }
@@ -64,29 +80,12 @@ test("buildStage1ConfigPatchFromFlatSettings maps github jira and confluence pro
   });
 });
 
-test("buildStage1ConfigPatchFromFlatSettings ignores unsupported credential mode", () => {
-  const patch = buildStage1ConfigPatchFromFlatSettings({
-    "providers.github.credential.mode": "invalid-mode",
-    "providers.github.credential.token": "dev-only-token"
-  });
-
-  assert.deepEqual(patch, {
-    providers: {
-      github: {
-        domain: "",
-        credential: {
-          mode: "none",
-          token: "dev-only-token"
-        }
-      }
+test("buildStage1ConfigPatchFromStructuredSettings maps llm.useMock and overrides llm.mode", () => {
+  const patch = buildStage1ConfigPatchFromStructuredSettings({
+    llm: {
+      mode: "copilot",
+      useMock: true
     }
-  });
-});
-
-test("buildStage1ConfigPatchFromFlatSettings maps llm.useMock and overrides llm.mode", () => {
-  const patch = buildStage1ConfigPatchFromFlatSettings({
-    "llm.mode": "copilot",
-    "llm.useMock": true
   });
 
   assert.deepEqual(patch, {
@@ -96,15 +95,57 @@ test("buildStage1ConfigPatchFromFlatSettings maps llm.useMock and overrides llm.
   });
 });
 
-test("buildStage1ConfigPatchFromFlatSettings maps llm.useMock=false to copilot", () => {
-  const patch = buildStage1ConfigPatchFromFlatSettings({
-    "llm.mode": "mock",
-    "llm.useMock": false
-  });
+test("buildStage1ConfigPatchFromStructuredSettings ignores non-object root", () => {
+  assert.deepEqual(buildStage1ConfigPatchFromStructuredSettings("invalid"), {});
+  assert.deepEqual(buildStage1ConfigPatchFromStructuredSettings(undefined), {});
+});
 
-  assert.deepEqual(patch, {
-    llm: {
-      mode: "copilot"
-    }
-  });
+test("buildStage1ConfigPatchFromStructuredSettings rejects github token credentials", () => {
+  assert.throws(
+    () =>
+      buildStage1ConfigPatchFromStructuredSettings({
+        providers: {
+          github: {
+            credential: {
+              tokenRef: "github_pat"
+            }
+          }
+        }
+      }),
+    /github\.credential only supports username\/password/i
+  );
+});
+
+test("buildStage1ConfigPatchFromStructuredSettings rejects jira basic credentials", () => {
+  assert.throws(
+    () =>
+      buildStage1ConfigPatchFromStructuredSettings({
+        providers: {
+          jira: {
+            credential: {
+              usernameRef: "jira_user",
+              passwordRef: "jira_pass"
+            }
+          }
+        }
+      }),
+    /jira\.credential only supports token/i
+  );
+});
+
+test("buildStage1ConfigPatchFromStructuredSettings rejects legacy credential.mode", () => {
+  assert.throws(
+    () =>
+      buildStage1ConfigPatchFromStructuredSettings({
+        providers: {
+          confluence: {
+            credential: {
+              mode: "oauth",
+              tokenRef: "confluence_token"
+            }
+          }
+        }
+      }),
+    /credential\.mode is not supported/i
+  );
 });

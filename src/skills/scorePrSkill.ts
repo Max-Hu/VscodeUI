@@ -54,7 +54,7 @@ export class ScorePrSkill implements Skill<ScorePrInput, ScorePrOutput, SkillCon
 
   async run(input: ScorePrInput, context: SkillContext): Promise<ScorePrOutput> {
     if (!context.llm) {
-      throw new Error("LLM provider is required for score-pr. Configure prReviewer.llm settings.");
+      throw new Error("LLM provider is required for score-pr. Configure prReviewer.config.llm settings.");
     }
 
     const prompt = buildScorePrompt({

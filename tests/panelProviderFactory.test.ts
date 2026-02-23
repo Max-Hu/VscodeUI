@@ -23,21 +23,15 @@ test("createPanelProviderSet returns real providers when useDemoData is false", 
       providers: {
         github: {
           domain: "https://api.github.com",
-          credential: {
-            mode: "none"
-          }
+          credential: {}
         },
         jira: {
           domain: "https://acme.atlassian.net",
-          credential: {
-            mode: "none"
-          }
+          credential: {}
         },
         confluence: {
           domain: "https://acme.atlassian.net/wiki",
-          credential: {
-            mode: "none"
-          }
+          credential: {}
         }
       }
     }

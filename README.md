@@ -1,4 +1,4 @@
-﻿# VS Code PR Reviewer
+# VS Code PR Reviewer
 
 VS Code PR Reviewer is an extension-oriented project that turns a single Pull Request link into a structured review workflow.
 It collects context from GitHub, Jira, and Confluence, asks VS Code Copilot to score and evaluate the change, generates an editable draft comment, and supports confirmed publishing.
@@ -88,7 +88,7 @@ It collects context from GitHub, Jira, and Confluence, asks VS Code Copilot to s
 
 - If Confluence retrieval fails and `continueOnConfluenceError=true`, the pipeline degrades gracefully with warnings.
 - Runtime progress emits step-level events and summaries (including key fetched counts and LLM runtime info).
-- Verbose logs can be enabled via `prReviewer.observability.verboseLogs`.
+- Verbose logs can be enabled via `prReviewer.config.observability.verboseLogs`.
 
 ## Architecture
 
@@ -104,19 +104,19 @@ It collects context from GitHub, Jira, and Confluence, asks VS Code Copilot to s
 
 ## LLM Strategy
 
-- Default mode is `llm.mode = copilot`.
+- Default mode is `prReviewer.config.llm.mode = copilot`.
 - Scoring and evaluation are done by Copilot output.
 - Local rule-based scoring fallback is intentionally disabled.
 - `mock` mode is available for testing and local development.
-- You can use `prReviewer.llm.useMock` as a quick boolean switch (`true` -> `mock`, `false` -> `copilot`).
+- You can use `prReviewer.config.llm.useMock` as a quick boolean switch (`true` -> `mock`, `false` -> `copilot`).
 - In `mock` mode, the extension uses a built-in `MockLlmProvider` and does not require Copilot chat models.
 
 ## Provider Runtime Behavior
 
 The stage-4 panel supports two runtime modes:
 
-- `prReviewer.providers.useDemoData = true` (default): use built-in demo providers
-- `prReviewer.providers.useDemoData = false`: use real HTTP providers
+- `prReviewer.config.providers.useDemoData = true` (default): use built-in demo providers
+- `prReviewer.config.providers.useDemoData = false`: use real HTTP providers
 
 Demo mode providers:
 
@@ -156,11 +156,11 @@ npm test
 - Press `F5` to launch the Extension Development Host.
 - Open the `PR Reviewer` activity-bar view.
 - Run review with a PR link, edit the draft, and publish.
-- Use launch profile `Debug PR Reviewer Extension (Copilot)` when `prReviewer.llm.mode=copilot`.
-- Use launch profile `Debug PR Reviewer Extension (Isolated)` with `prReviewer.llm.mode=mock`.
+- Use launch profile `Debug PR Reviewer Extension (Copilot)` when `prReviewer.config.llm.mode=copilot`.
+- Use launch profile `Debug PR Reviewer Extension (Isolated)` with `prReviewer.config.llm.mode=mock`.
 - During review, the panel shows live progress lines (pipeline and step events), including LLM runtime info (provider/mode/model when available).
 - Backend debug logs are written to Output channel `PR Reviewer` (`View -> Output`).
-- With `prReviewer.observability.verboseLogs=true`, prompt/response previews sent to LLM are also logged (truncated for safety).
+- With `prReviewer.config.observability.verboseLogs=true`, prompt/response previews sent to LLM are also logged (truncated for safety).
 
 ## Package, Install, and Use
 
@@ -169,7 +169,7 @@ npm test
 - VS Code `>= 1.96.0`
 - Node.js `20.11.1`
 - npm `10.2.4`
-- For `llm.mode=copilot`: active GitHub Copilot in VS Code
+- For `prReviewer.config.llm.mode=copilot`: active GitHub Copilot in VS Code
 - For packaging: `@vscode/vsce`
 
 ### 2. Prepare for Packaging
@@ -222,12 +222,18 @@ code --install-extension pr-reviewer.vsix --force
 ### 5. Configure and Use
 
 1. Open workspace settings (`.vscode/settings.json`).
-2. For demo mode, set `prReviewer.providers.useDemoData=true`.
-3. For real mode, set `prReviewer.providers.useDemoData=false`.
-4. If real mode is used, configure provider domain and credentials.
-5. If you use `tokenRef/usernameRef/passwordRef`, set matching environment variables before launching VS Code.
-6. Open `PR Reviewer` from the activity bar.
-7. Enter PR link, run review, edit draft, publish.
+2. Configure `prReviewer.config` (structured JSON object).
+3. For demo mode, set `prReviewer.config.providers.useDemoData=true`.
+4. For real mode, set `prReviewer.config.providers.useDemoData=false`.
+5. If real mode is used, configure provider domains and credentials.
+6. If you use `tokenRef/usernameRef/passwordRef`, set matching environment variables before launching VS Code.
+7. Open `PR Reviewer` from the activity bar.
+8. Enter PR link, run review, edit draft, publish.
+
+Important:
+
+- Legacy flat settings under `prReviewer.*` (for example `prReviewer.llm.mode`) are no longer read.
+- Only `prReviewer.config` is supported.
 
 ### 6. Optional: Internal TLS Environments
 
@@ -235,8 +241,12 @@ If your internal endpoints use self-signed certificates, you can disable TLS cer
 
 ```json
 {
-  "prReviewer.providers.useDemoData": false,
-  "prReviewer.providers.disableTlsValidation": true
+  "prReviewer.config": {
+    "providers": {
+      "useDemoData": false,
+      "disableTlsValidation": true
+    }
+  }
 }
 ```
 
@@ -244,98 +254,100 @@ Use this only in trusted environments.
 
 ## Configuration
 
-All settings are under `prReviewer.*`.
+All settings are under `prReviewer.config`.
 
-### Provider Settings
+### Credential Rules (This Build)
 
-- `prReviewer.providers.github.domain`
-- `prReviewer.providers.github.credential.mode`
-- `prReviewer.providers.github.credential.tokenRef`
-- `prReviewer.providers.jira.domain`
-- `prReviewer.providers.jira.credential.mode`
-- `prReviewer.providers.jira.credential.tokenRef`
-- `prReviewer.providers.jira.credential.usernameRef`
-- `prReviewer.providers.jira.credential.passwordRef`
-- `prReviewer.providers.confluence.domain`
-- `prReviewer.providers.confluence.credential.mode`
-- `prReviewer.providers.confluence.credential.tokenRef`
-- `prReviewer.providers.useDemoData`
-- `prReviewer.providers.disableTlsValidation`
+- `GitHub` only supports `username/password` (or `usernameRef/passwordRef`)
+- `Jira` only supports `token` (or `tokenRef`)
+- `Confluence` only supports `token` (or `tokenRef`)
 
-### Runtime Switches
-
-- `prReviewer.llm.mode` (`copilot` or `mock`)
-- `prReviewer.llm.useMock` (`true` -> `mock`, `false` -> `copilot`; overrides `prReviewer.llm.mode` when set)
-- `prReviewer.post.enabled`
-- `prReviewer.post.requireConfirmation`
-- `prReviewer.resilience.continueOnConfluenceError`
-- `prReviewer.observability.enabled`
-- `prReviewer.observability.verboseLogs`
-
-### What Each `prReviewer` Setting Means
+### What Each `prReviewer.config` Setting Means
 
 | Setting | Meaning | Default |
 | --- | --- | --- |
-| `prReviewer.providers.github.domain` | GitHub API base URL used in real-provider mode. | `https://api.github.com` |
-| `prReviewer.providers.github.credential.mode` | Auth mode for GitHub (`none/pat/oauth/basic/vscodeAuth`). | `none` |
-| `prReviewer.providers.github.credential.tokenRef` | Env var key name for GitHub token when mode is `pat` or `oauth`. | `""` |
-| `prReviewer.providers.jira.domain` | Jira base URL used in real-provider mode. | `https://your-domain.atlassian.net` |
-| `prReviewer.providers.jira.credential.mode` | Auth mode for Jira (`none/pat/oauth/basic/vscodeAuth`). | `none` |
-| `prReviewer.providers.jira.credential.tokenRef` | Env var key name for Jira token when mode is `pat` or `oauth`. | `""` |
-| `prReviewer.providers.jira.credential.usernameRef` | Env var key name for Jira username when mode is `basic`. | `""` |
-| `prReviewer.providers.jira.credential.passwordRef` | Env var key name for Jira password when mode is `basic`. | `""` |
-| `prReviewer.providers.confluence.domain` | Confluence base URL used in real-provider mode. | `https://your-domain.atlassian.net/wiki` |
-| `prReviewer.providers.confluence.credential.mode` | Auth mode for Confluence (`none/pat/oauth/basic/vscodeAuth`). | `none` |
-| `prReviewer.providers.confluence.credential.tokenRef` | Env var key name for Confluence token when mode is `pat` or `oauth`. | `""` |
-| `prReviewer.providers.useDemoData` | `true`: use demo providers; `false`: use real HTTP providers. | `true` |
-| `prReviewer.providers.disableTlsValidation` | Disable HTTPS certificate validation for real providers. Use only in trusted internal environments. | `false` |
-| `prReviewer.llm.mode` | LLM execution mode for scoring/drafting (`copilot` or `mock`). | `copilot` |
-| `prReviewer.llm.useMock` | Quick boolean switch for LLM mode. `true` forces `mock`, `false` forces `copilot`. Overrides `prReviewer.llm.mode` when provided. | unset |
-| `prReviewer.post.enabled` | Enable/disable publishing comments back to PR. | `true` |
-| `prReviewer.post.requireConfirmation` | Require explicit confirmation before publish. | `true` |
-| `prReviewer.resilience.continueOnConfluenceError` | Continue pipeline with warning when Confluence retrieval fails. | `true` |
-| `prReviewer.observability.enabled` | Emit pipeline/step observability events. | `true` |
-| `prReviewer.observability.verboseLogs` | Print verbose debug logs (inbound/outbound payloads and raw pipeline events) to Output channel `PR Reviewer`. | `false` |
+| `prReviewer.config.providers` | Container for provider runtime switches and provider connection settings. | `{}` |
+| `prReviewer.config.providers.useDemoData` | `true`: use built-in demo providers; `false`: use real HTTP providers. | `true` |
+| `prReviewer.config.providers.disableTlsValidation` | Disable HTTPS certificate validation for real providers. Use only in trusted internal environments. | `false` |
+| `prReviewer.config.providers.github` | GitHub provider configuration container. | `{}` |
+| `prReviewer.config.providers.github.domain` | GitHub API base URL used in real-provider mode. | `https://api.github.com` |
+| `prReviewer.config.providers.github.credential` | GitHub credential container. Only username/password fields are supported. | `{}` |
+| `prReviewer.config.providers.github.credential.usernameRef` | Environment variable name that stores the GitHub username. | `""` |
+| `prReviewer.config.providers.github.credential.passwordRef` | Environment variable name that stores the GitHub password. | `""` |
+| `prReviewer.config.providers.github.credential.username` | Direct GitHub username (prefer `usernameRef`). | `""` |
+| `prReviewer.config.providers.github.credential.password` | Direct GitHub password (prefer `passwordRef`). | `""` |
+| `prReviewer.config.providers.jira` | Jira provider configuration container. | `{}` |
+| `prReviewer.config.providers.jira.domain` | Jira base URL used in real-provider mode. | `https://your-domain.atlassian.net` |
+| `prReviewer.config.providers.jira.credential` | Jira credential container. Only token fields are supported. | `{}` |
+| `prReviewer.config.providers.jira.credential.tokenRef` | Environment variable name that stores the Jira token. | `""` |
+| `prReviewer.config.providers.jira.credential.token` | Direct Jira token (prefer `tokenRef`). | `""` |
+| `prReviewer.config.providers.confluence` | Confluence provider configuration container. | `{}` |
+| `prReviewer.config.providers.confluence.domain` | Confluence base URL used in real-provider mode (usually ends with `/wiki`). | `https://your-domain.atlassian.net/wiki` |
+| `prReviewer.config.providers.confluence.credential` | Confluence credential container. Only token fields are supported. | `{}` |
+| `prReviewer.config.providers.confluence.credential.tokenRef` | Environment variable name that stores the Confluence token. | `""` |
+| `prReviewer.config.providers.confluence.credential.token` | Direct Confluence token (prefer `tokenRef`). | `""` |
+| `prReviewer.config.llm` | LLM runtime configuration container. | `{}` |
+| `prReviewer.config.llm.mode` | LLM execution mode for scoring/drafting (`copilot` or `mock`). | `copilot` |
+| `prReviewer.config.llm.useMock` | Quick boolean override for LLM mode. `true` forces `mock`, `false` forces `copilot`. | unset |
+| `prReviewer.config.post` | Publish behavior configuration container. | `{}` |
+| `prReviewer.config.post.enabled` | Enable/disable publishing comments back to PR. | `true` |
+| `prReviewer.config.post.requireConfirmation` | Require explicit confirmation before publish. | `true` |
+| `prReviewer.config.resilience` | Failure tolerance configuration container. | `{}` |
+| `prReviewer.config.resilience.continueOnConfluenceError` | Continue pipeline with warning when Confluence retrieval fails. | `true` |
+| `prReviewer.config.observability` | Logging and observability configuration container. | `{}` |
+| `prReviewer.config.observability.enabled` | Emit pipeline/step observability events. | `true` |
+| `prReviewer.config.observability.verboseLogs` | Print verbose debug logs (inbound/outbound payloads and raw pipeline events) to Output channel `PR Reviewer`. | `false` |
 
 Notes:
 
-- `tokenRef/usernameRef/passwordRef` currently resolve from environment variables whose names equal the `*Ref` values.
-- `prReviewer.providers.disableTlsValidation` only affects real-provider mode (`prReviewer.providers.useDemoData=false`).
-
-### Credential Modes
-
-- `none`
-- `pat`
-- `oauth`
-- `basic`
-- `vscodeAuth`
+- `tokenRef/usernameRef/passwordRef` resolve from environment variables whose names equal the `*Ref` values.
+- `prReviewer.config.providers.disableTlsValidation` only affects real-provider mode (`prReviewer.config.providers.useDemoData=false`).
+- Prefer `*Ref` fields over direct credentials in `settings.json`.
 
 ### Example `.vscode/settings.json`
 
 ```json
 {
-  "prReviewer.providers.github.domain": "https://api.github.com",
-  "prReviewer.providers.github.credential.mode": "pat",
-  "prReviewer.providers.github.credential.tokenRef": "github_pat",
-
-  "prReviewer.providers.jira.domain": "https://acme.atlassian.net",
-  "prReviewer.providers.jira.credential.mode": "basic",
-  "prReviewer.providers.jira.credential.usernameRef": "jira_user",
-  "prReviewer.providers.jira.credential.passwordRef": "jira_pass",
-
-  "prReviewer.providers.confluence.domain": "https://acme.atlassian.net/wiki",
-  "prReviewer.providers.confluence.credential.mode": "oauth",
-  "prReviewer.providers.confluence.credential.tokenRef": "confluence_token",
-  "prReviewer.providers.useDemoData": true,
-  "prReviewer.providers.disableTlsValidation": false,
-
-  "prReviewer.llm.mode": "copilot",
-  "prReviewer.llm.useMock": false,
-  "prReviewer.post.enabled": true,
-  "prReviewer.post.requireConfirmation": true,
-  "prReviewer.resilience.continueOnConfluenceError": true,
-  "prReviewer.observability.enabled": true,
-  "prReviewer.observability.verboseLogs": true
+  "prReviewer.config": {
+    "providers": {
+      "useDemoData": false,
+      "disableTlsValidation": false,
+      "github": {
+        "domain": "https://api.github.com",
+        "credential": {
+          "usernameRef": "github_user",
+          "passwordRef": "github_pass"
+        }
+      },
+      "jira": {
+        "domain": "https://acme.atlassian.net",
+        "credential": {
+          "tokenRef": "jira_token"
+        }
+      },
+      "confluence": {
+        "domain": "https://acme.atlassian.net/wiki",
+        "credential": {
+          "tokenRef": "confluence_token"
+        }
+      }
+    },
+    "llm": {
+      "mode": "copilot",
+      "useMock": false
+    },
+    "post": {
+      "enabled": true,
+      "requireConfirmation": true
+    },
+    "resilience": {
+      "continueOnConfluenceError": true
+    },
+    "observability": {
+      "enabled": true,
+      "verboseLogs": true
+    }
+  }
 }
 ```
 
@@ -374,21 +386,21 @@ Current tests cover:
 
 ## Known Boundaries
 
-- `prReviewer.providers.useDemoData=true` uses static demo data.
-- `prReviewer.providers.useDemoData=false` uses HTTP APIs and requires valid domains/credentials.
-- `prReviewer.providers.disableTlsValidation=true` disables HTTPS certificate validation in real-provider mode (use only in trusted internal environments).
+- `prReviewer.config.providers.useDemoData=true` uses static demo data.
+- `prReviewer.config.providers.useDemoData=false` uses HTTP APIs and requires valid domains/credentials.
+- `prReviewer.config.providers.disableTlsValidation=true` disables HTTPS certificate validation in real-provider mode (use only in trusted internal environments).
 - Credential `*Ref` values are resolved from environment variables in current implementation.
 - For real environments, credentials should be stored in VS Code SecretStorage; direct credential fields are best for local/debug usage only.
 
 ## Troubleshooting
 
 - Error: `LLM provider is required for score-pr...`
-  - Set `"prReviewer.llm.useMock": true` to force built-in mock LLM, or
-  - Set `"prReviewer.llm.useMock": false` (or `"prReviewer.llm.mode": "copilot"`) and ensure Copilot chat model is available.
+  - Set `"prReviewer.config.llm.useMock": true` to force built-in mock LLM, or
+  - Set `"prReviewer.config.llm.useMock": false` (or `"prReviewer.config.llm.mode": "copilot"`) and ensure Copilot chat model is available.
 - No logs in Output channel:
   - Open `View -> Output` in the Extension Development Host window and select channel `PR Reviewer`.
-  - Ensure `"prReviewer.observability.enabled": true` if you want step-by-step pipeline events.
-  - Set `"prReviewer.observability.verboseLogs": true` for detailed payload/event logs and auto-open Output panel on request.
+  - Ensure `"prReviewer.config.observability.enabled": true` if you want step-by-step pipeline events.
+  - Set `"prReviewer.config.observability.verboseLogs": true` for detailed payload/event logs and auto-open Output panel on request.
 
 ## Related Documents
 
@@ -398,3 +410,5 @@ Current tests cover:
 - `requirement/stage2-delivery.md`
 - `requirement/stage3-delivery.md`
 - `requirement/stage4-delivery.md`
+
+

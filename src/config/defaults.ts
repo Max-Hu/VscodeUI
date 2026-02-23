@@ -9,21 +9,15 @@ export const defaultStage1Config: Stage1Config = {
   providers: {
     github: {
       domain: "https://api.github.com",
-      credential: {
-        mode: "none"
-      }
+      credential: {}
     },
     jira: {
       domain: "https://your-domain.atlassian.net",
-      credential: {
-        mode: "none"
-      }
+      credential: {}
     },
     confluence: {
       domain: "https://your-domain.atlassian.net/wiki",
-      credential: {
-        mode: "none"
-      }
+      credential: {}
     }
   },
   llm: {

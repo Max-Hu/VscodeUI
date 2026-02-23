@@ -42,129 +42,193 @@
     "configuration": {
       "title": "PR Reviewer",
       "properties": {
-        "prReviewer.providers.github.domain": {
-          "type": "string",
-          "default": "https://api.github.com",
-          "description": "GitHub API domain."
-        },
-        "prReviewer.providers.github.credential.mode": {
-          "type": "string",
-          "enum": [
-            "none",
-            "pat",
-            "oauth",
-            "basic",
-            "vscodeAuth"
-          ],
-          "default": "none",
-          "description": "GitHub credential mode."
-        },
-        "prReviewer.providers.github.credential.tokenRef": {
-          "type": "string",
-          "default": "",
-          "description": "Secret key reference for GitHub token."
-        },
-        "prReviewer.providers.jira.domain": {
-          "type": "string",
-          "default": "https://your-domain.atlassian.net",
-          "description": "Jira domain."
-        },
-        "prReviewer.providers.jira.credential.mode": {
-          "type": "string",
-          "enum": [
-            "none",
-            "pat",
-            "oauth",
-            "basic",
-            "vscodeAuth"
-          ],
-          "default": "none",
-          "description": "Jira credential mode."
-        },
-        "prReviewer.providers.jira.credential.tokenRef": {
-          "type": "string",
-          "default": "",
-          "description": "Secret key reference for Jira token."
-        },
-        "prReviewer.providers.jira.credential.usernameRef": {
-          "type": "string",
-          "default": "",
-          "description": "Secret key reference for Jira username."
-        },
-        "prReviewer.providers.jira.credential.passwordRef": {
-          "type": "string",
-          "default": "",
-          "description": "Secret key reference for Jira password."
-        },
-        "prReviewer.providers.confluence.domain": {
-          "type": "string",
-          "default": "https://your-domain.atlassian.net/wiki",
-          "description": "Confluence domain."
-        },
-        "prReviewer.providers.confluence.credential.mode": {
-          "type": "string",
-          "enum": [
-            "none",
-            "pat",
-            "oauth",
-            "basic",
-            "vscodeAuth"
-          ],
-          "default": "none",
-          "description": "Confluence credential mode."
-        },
-        "prReviewer.providers.confluence.credential.tokenRef": {
-          "type": "string",
-          "default": "",
-          "description": "Secret key reference for Confluence token."
-        },
-        "prReviewer.providers.useDemoData": {
-          "type": "boolean",
-          "default": true,
-          "description": "Use built-in demo providers for panel runtime."
-        },
-        "prReviewer.providers.disableTlsValidation": {
-          "type": "boolean",
-          "default": false,
-          "description": "Disable TLS certificate validation for HTTPS requests in real provider mode."
-        },
-        "prReviewer.post.enabled": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enable publish flow."
-        },
-        "prReviewer.post.requireConfirmation": {
-          "type": "boolean",
-          "default": true,
-          "description": "Require publish confirmation."
-        },
-        "prReviewer.llm.mode": {
-          "type": "string",
-          "enum": [
-            "copilot",
-            "mock"
-          ],
-          "default": "copilot",
-          "description": "LLM execution mode."
-        },
-        "prReviewer.llm.useMock": {
-          "type": "boolean",
-          "description": "Quick switch for LLM mode. true=mock, false=copilot. This setting overrides prReviewer.llm.mode when provided."
-        },
-        "prReviewer.resilience.continueOnConfluenceError": {
-          "type": "boolean",
-          "default": true,
-          "description": "Continue review when Confluence retrieval fails."
-        },
-        "prReviewer.observability.enabled": {
-          "type": "boolean",
-          "default": true,
-          "description": "Emit observability events."
-        },
-        "prReviewer.observability.verboseLogs": {
-          "type": "boolean",
-          "default": false,
-          "description": "Enable verbose debug logs in Output channel, including event payload details."
+        "prReviewer.config": {
+          "type": "object",
+          "default": {},
+          "description": "Structured PR Reviewer configuration (breaking change from legacy flat prReviewer.* keys).",
+          "additionalProperties": false,
+          "properties": {
+            "providers": {
+              "type": "object",
+              "description": "Provider runtime switches and connection settings.",
+              "additionalProperties": false,
+              "properties": {
+                "useDemoData": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Use built-in demo providers instead of real HTTP providers."
+                },
+                "disableTlsValidation": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Disable TLS certificate validation for real HTTP providers."
+                },
+                "github": {
+                  "type": "object",
+                  "description": "GitHub provider settings (username/password auth only).",
+                  "additionalProperties": false,
+                  "properties": {
+                    "domain": {
+                      "type": "string",
+                      "default": "https://api.github.com",
+                      "description": "GitHub API base URL."
+                    },
+                    "credential": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "description": "GitHub credentials. Only username/password are supported.",
+                      "properties": {
+                        "usernameRef": {
+                          "type": "string",
+                          "default": "",
+                          "description": "Environment variable name containing GitHub username."
+                        },
+                        "passwordRef": {
+                          "type": "string",
+                          "default": "",
+                          "description": "Environment variable name containing GitHub password."
+                        },
+                        "username": {
+                          "type": "string",
+                          "default": "",
+                          "description": "Direct GitHub username (prefer usernameRef)."
+                        },
+                        "password": {
+                          "type": "string",
+                          "default": "",
+                          "description": "Direct GitHub password (prefer passwordRef)."
+                        }
+                      }
+                    }
+                  }
+                },
+                "jira": {
+                  "type": "object",
+                  "description": "Jira provider settings (token auth only).",
+                  "additionalProperties": false,
+                  "properties": {
+                    "domain": {
+                      "type": "string",
+                      "default": "https://your-domain.atlassian.net",
+                      "description": "Jira base URL."
+                    },
+                    "credential": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "description": "Jira credentials. Only token/tokenRef are supported.",
+                      "properties": {
+                        "tokenRef": {
+                          "type": "string",
+                          "default": "",
+                          "description": "Environment variable name containing Jira token."
+                        },
+                        "token": {
+                          "type": "string",
+                          "default": "",
+                          "description": "Direct Jira token (prefer tokenRef)."
+                        }
+                      }
+                    }
+                  }
+                },
+                "confluence": {
+                  "type": "object",
+                  "description": "Confluence provider settings (token auth only).",
+                  "additionalProperties": false,
+                  "properties": {
+                    "domain": {
+                      "type": "string",
+                      "default": "https://your-domain.atlassian.net/wiki",
+                      "description": "Confluence base URL."
+                    },
+                    "credential": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "description": "Confluence credentials. Only token/tokenRef are supported.",
+                      "properties": {
+                        "tokenRef": {
+                          "type": "string",
+                          "default": "",
+                          "description": "Environment variable name containing Confluence token."
+                        },
+                        "token": {
+                          "type": "string",
+                          "default": "",
+                          "description": "Direct Confluence token (prefer tokenRef)."
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "llm": {
+              "type": "object",
+              "description": "LLM execution settings.",
+              "additionalProperties": false,
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "enum": [
+                    "copilot",
+                    "mock"
+                  ],
+                  "default": "copilot",
+                  "description": "LLM execution mode."
+                },
+                "useMock": {
+                  "type": "boolean",
+                  "description": "Quick switch. true=mock, false=copilot. Overrides llm.mode when provided."
+                }
+              }
+            },
+            "post": {
+              "type": "object",
+              "description": "Publish behavior settings.",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Enable publish flow."
+                },
+                "requireConfirmation": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Require confirmation before publishing."
+                }
+              }
+            },
+            "resilience": {
+              "type": "object",
+              "description": "Failure tolerance settings.",
+              "additionalProperties": false,
+              "properties": {
+                "continueOnConfluenceError": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Continue review when Confluence retrieval fails."
+                }
+              }
+            },
+            "observability": {
+              "type": "object",
+              "description": "Logging and observability settings.",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Emit observability events."
+                },
+                "verboseLogs": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Enable verbose debug logs in Output channel."
+                }
+              }
+            }
+          }
         }
       }
     }

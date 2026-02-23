@@ -24,7 +24,7 @@ export class DraftCommentSkill implements Skill<DraftCommentInput, DraftCommentO
 
   async run(input: DraftCommentInput, context: SkillContext): Promise<DraftCommentOutput> {
     if (!context.llm) {
-      throw new Error("LLM provider is required for draft-comment. Configure prReviewer.llm settings.");
+      throw new Error("LLM provider is required for draft-comment. Configure prReviewer.config.llm settings.");
     }
 
     const prompt = buildDraftPrompt({

@@ -63,6 +63,8 @@ export class PrReviewerPanelProvider implements vscode.WebviewViewProvider {
   }
 
   private async createOrchestrator(): Promise<Stage1ReviewOrchestrator> {
+    const configuration = vscode.workspace.getConfiguration(PR_REVIEWER_SETTINGS_SECTION);
+    const structuredConfig = configuration.get("config");
     let configPatch: Stage1ConfigPatch = {};
     try {
       configPatch = await loadStage1ConfigPatchFromVsCodeSettings(PR_REVIEWER_SETTINGS_SECTION);
@@ -71,12 +73,8 @@ export class PrReviewerPanelProvider implements vscode.WebviewViewProvider {
       void vscode.window.showWarningMessage(`PR Reviewer settings fallback to defaults: ${message}`);
       this.outputChannel.appendLine(`[config] fallback to defaults: ${message}`);
     }
-    const useDemoData = vscode.workspace
-      .getConfiguration(PR_REVIEWER_SETTINGS_SECTION)
-      .get<boolean>("providers.useDemoData", true);
-    const disableTlsValidation = vscode.workspace
-      .getConfiguration(PR_REVIEWER_SETTINGS_SECTION)
-      .get<boolean>("providers.disableTlsValidation", false);
+    const useDemoData = readBooleanSetting(structuredConfig, "providers.useDemoData", true);
+    const disableTlsValidation = readBooleanSetting(structuredConfig, "providers.disableTlsValidation", false);
     const providers = createPanelProviderSet({
       useDemoData,
       disableTlsValidation,
@@ -126,9 +124,8 @@ export class PrReviewerPanelProvider implements vscode.WebviewViewProvider {
   }
 
   private isVerboseLogsEnabled(): boolean {
-    return vscode.workspace
-      .getConfiguration(PR_REVIEWER_SETTINGS_SECTION)
-      .get<boolean>("observability.verboseLogs", false);
+    const structuredConfig = vscode.workspace.getConfiguration(PR_REVIEWER_SETTINGS_SECTION).get("config");
+    return readBooleanSetting(structuredConfig, "observability.verboseLogs", false);
   }
 }
 
@@ -138,4 +135,25 @@ function safeStringify(value: unknown): string {
   } catch {
     return "[unserializable]";
   }
+}
+
+function readBooleanSetting(root: unknown, path: string, defaultValue: boolean): boolean {
+  const value = getNestedValue(root, path);
+  return typeof value === "boolean" ? value : defaultValue;
+}
+
+function getNestedValue(root: unknown, path: string): unknown {
+  const segments = path.split(".");
+  let current: unknown = root;
+  for (const segment of segments) {
+    if (!isRecord(current)) {
+      return undefined;
+    }
+    current = current[segment];
+  }
+  return current;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
