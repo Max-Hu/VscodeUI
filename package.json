@@ -65,38 +65,28 @@
                 },
                 "github": {
                   "type": "object",
-                  "description": "GitHub provider settings (username/password auth only).",
+                  "description": "GitHub provider settings (token auth only, API base must end with /api/v3).",
                   "additionalProperties": false,
                   "properties": {
                     "domain": {
                       "type": "string",
-                      "default": "https://api.github.com",
-                      "description": "GitHub API base URL."
+                      "default": "https://alm-github.test/api/v3",
+                      "description": "GitHub API base URL. Must match https://{host}/api/v3."
                     },
                     "credential": {
                       "type": "object",
                       "additionalProperties": false,
-                      "description": "GitHub credentials. Only username/password are supported.",
+                      "description": "GitHub credentials. Only token/tokenRef are supported.",
                       "properties": {
-                        "usernameRef": {
+                        "tokenRef": {
                           "type": "string",
                           "default": "",
-                          "description": "Environment variable name containing GitHub username."
+                          "description": "Environment variable name containing GitHub token."
                         },
-                        "passwordRef": {
+                        "token": {
                           "type": "string",
                           "default": "",
-                          "description": "Environment variable name containing GitHub password."
-                        },
-                        "username": {
-                          "type": "string",
-                          "default": "",
-                          "description": "Direct GitHub username (prefer usernameRef)."
-                        },
-                        "password": {
-                          "type": "string",
-                          "default": "",
-                          "description": "Direct GitHub password (prefer passwordRef)."
+                          "description": "Direct GitHub token (prefer tokenRef)."
                         }
                       }
                     }
@@ -109,8 +99,8 @@
                   "properties": {
                     "domain": {
                       "type": "string",
-                      "default": "https://your-domain.atlassian.net",
-                      "description": "Jira base URL."
+                      "default": "https://alm-jira.test/jira",
+                      "description": "Jira base URL. Must match https://{host}/jira or .../jira/rest/api/2."
                     },
                     "credential": {
                       "type": "object",
@@ -138,8 +128,8 @@
                   "properties": {
                     "domain": {
                       "type": "string",
-                      "default": "https://your-domain.atlassian.net/wiki",
-                      "description": "Confluence base URL."
+                      "default": "https://alm-confluence.test/confluence",
+                      "description": "Confluence base URL. Must match https://{host}/confluence or .../confluence/rest/api."
                     },
                     "credential": {
                       "type": "object",

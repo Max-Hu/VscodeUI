@@ -93,6 +93,9 @@ function readProviderConnection(
   }
 
   const domain = asNonEmptyString(connection.domain);
+  if (domain) {
+    assertSupportedProviderDomainShape(domain, provider);
+  }
   const credential = readProviderCredential(connection.credential, provider);
   if (!domain && !credential) {
     return undefined;
@@ -121,33 +124,7 @@ function readProviderCredential(
     );
   }
 
-  return provider === "github"
-    ? readGithubCredential(credential)
-    : readTokenCredential(credential, `prReviewer.config.providers.${provider}.credential`);
-}
-
-function readGithubCredential(value: Record<string, unknown>): ProviderCredentialConfig | undefined {
-  if ("token" in value || "tokenRef" in value) {
-    throw new Error(
-      "prReviewer.config.providers.github.credential only supports username/password (or usernameRef/passwordRef)."
-    );
-  }
-
-  const username = asNonEmptyString(value.username);
-  const usernameRef = asNonEmptyString(value.usernameRef);
-  const password = asNonEmptyString(value.password);
-  const passwordRef = asNonEmptyString(value.passwordRef);
-
-  if (!username && !usernameRef && !password && !passwordRef) {
-    return undefined;
-  }
-
-  return {
-    ...(username ? { username } : {}),
-    ...(usernameRef ? { usernameRef } : {}),
-    ...(password ? { password } : {}),
-    ...(passwordRef ? { passwordRef } : {})
-  };
+  return readTokenCredential(credential, `prReviewer.config.providers.${provider}.credential`);
 }
 
 function readTokenCredential(value: Record<string, unknown>, path: string): ProviderCredentialConfig | undefined {
@@ -165,6 +142,31 @@ function readTokenCredential(value: Record<string, unknown>, path: string): Prov
     ...(token ? { token } : {}),
     ...(tokenRef ? { tokenRef } : {})
   };
+}
+
+function assertSupportedProviderDomainShape(
+  domain: string,
+  provider: "github" | "jira" | "confluence"
+): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(domain);
+  } catch {
+    throw new Error(`prReviewer.config.providers.${provider}.domain must be a valid URL.`);
+  }
+
+  const path = parsed.pathname.replace(/\/+$/, "");
+  if (provider === "github" && !/\/api\/v3$/i.test(path)) {
+    throw new Error("prReviewer.config.providers.github.domain must match https://{host}/api/v3.");
+  }
+  if (provider === "jira" && !(/\/jira$/i.test(path) || /\/jira\/rest\/api\/2$/i.test(path))) {
+    throw new Error("prReviewer.config.providers.jira.domain must match https://{host}/jira or .../jira/rest/api/2.");
+  }
+  if (provider === "confluence" && !(/\/confluence$/i.test(path) || /\/confluence\/rest\/api$/i.test(path))) {
+    throw new Error(
+      "prReviewer.config.providers.confluence.domain must match https://{host}/confluence or .../confluence/rest/api."
+    );
+  }
 }
 
 function readLlmSettings(value: unknown): Stage1ConfigPatch["llm"] | undefined {

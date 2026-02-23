@@ -195,3 +195,89 @@ test("FetchConfluenceContextSkill ignores non-confluence Jira links for direct p
   assert.equal(capturedUrls.length, 1);
   assert.deepEqual(capturedUrls[0], ["https://example.atlassian.net/wiki/spaces/ENG/pages/101"]);
 });
+
+test("FetchConfluenceContextSkill accepts confluence-like paths on custom hosts without domain match", async () => {
+  const capturedUrls: string[][] = [];
+  const context: SkillContext = {
+    config: {
+      ...defaultStage1Config,
+      providers: {
+        ...defaultStage1Config.providers,
+        confluence: {
+          ...defaultStage1Config.providers.confluence,
+          domain: "https://some-other-domain.internal/wiki"
+        }
+      }
+    },
+    providers: {
+      github: {
+        async getPullRequest() {
+          throw new Error("not used");
+        },
+        async publishReviewComment() {
+          throw new Error("not used");
+        }
+      },
+      jira: {
+        async getIssues() {
+          throw new Error("not used");
+        }
+      },
+      confluence: {
+        async getPagesByUrls(urls: string[]) {
+          capturedUrls.push(urls);
+          return [];
+        },
+        async searchPages() {
+          return [];
+        }
+      }
+    }
+  };
+
+  const skill = new FetchConfluenceContextSkill();
+  await skill.run(
+    {
+      githubContext: {
+        metadata: {
+          title: "PROJ-100",
+          body: "",
+          author: "alice",
+          baseBranch: "main",
+          headBranch: "feature",
+          url: "https://git.example.internal/acme/platform/pull/42"
+        },
+        files: [],
+        commits: [],
+        checks: [],
+        comments: [],
+        signals: {
+          confluenceLinks: ["https://docs.internal.local/wiki/spaces/ENG/pages/101"],
+          keywords: []
+        }
+      },
+      jiraContext: {
+        requestedKeys: ["PROJ-100"],
+        issues: [
+          {
+            key: "PROJ-100",
+            summary: "Custom domain docs",
+            description: "",
+            acceptanceCriteria: [],
+            nfr: [],
+            risks: [],
+            testingRequirements: [],
+            links: ["https://docs.internal.local/pages/viewpage.action?pageId=12345"]
+          }
+        ]
+      }
+    },
+    context
+  );
+
+  assert.equal(capturedUrls.length, 1);
+  assert.deepEqual(capturedUrls[0], [
+    "https://docs.internal.local/pages/viewpage.action?pageId=12345",
+    "https://docs.internal.local/wiki/spaces/ENG/pages/101"
+  ]);
+});

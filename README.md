@@ -226,7 +226,7 @@ code --install-extension pr-reviewer.vsix --force
 3. For demo mode, set `prReviewer.config.providers.useDemoData=true`.
 4. For real mode, set `prReviewer.config.providers.useDemoData=false`.
 5. If real mode is used, configure provider domains and credentials.
-6. If you use `tokenRef/usernameRef/passwordRef`, set matching environment variables before launching VS Code.
+6. If you use `tokenRef`, set matching environment variables before launching VS Code.
 7. Open `PR Reviewer` from the activity bar.
 8. Enter PR link, run review, edit draft, publish.
 
@@ -258,9 +258,13 @@ All settings are under `prReviewer.config`.
 
 ### Credential Rules (This Build)
 
-- `GitHub` only supports `username/password` (or `usernameRef/passwordRef`)
+- `GitHub` only supports `token` (or `tokenRef`)
 - `Jira` only supports `token` (or `tokenRef`)
 - `Confluence` only supports `token` (or `tokenRef`)
+- Supported domain shapes in this build:
+- `GitHub`: `https://{host}/api/v3`
+- `Jira`: `https://{host}/jira` (or `.../jira/rest/api/2`)
+- `Confluence`: `https://{host}/confluence` (or `.../confluence/rest/api`)
 
 ### What Each `prReviewer.config` Setting Means
 
@@ -270,19 +274,17 @@ All settings are under `prReviewer.config`.
 | `prReviewer.config.providers.useDemoData` | `true`: use built-in demo providers; `false`: use real HTTP providers. | `true` |
 | `prReviewer.config.providers.disableTlsValidation` | Disable HTTPS certificate validation for real providers. Use only in trusted internal environments. | `false` |
 | `prReviewer.config.providers.github` | GitHub provider configuration container. | `{}` |
-| `prReviewer.config.providers.github.domain` | GitHub API base URL used in real-provider mode. | `https://api.github.com` |
-| `prReviewer.config.providers.github.credential` | GitHub credential container. Only username/password fields are supported. | `{}` |
-| `prReviewer.config.providers.github.credential.usernameRef` | Environment variable name that stores the GitHub username. | `""` |
-| `prReviewer.config.providers.github.credential.passwordRef` | Environment variable name that stores the GitHub password. | `""` |
-| `prReviewer.config.providers.github.credential.username` | Direct GitHub username (prefer `usernameRef`). | `""` |
-| `prReviewer.config.providers.github.credential.password` | Direct GitHub password (prefer `passwordRef`). | `""` |
+| `prReviewer.config.providers.github.domain` | GitHub API base URL used in real-provider mode. Must match `https://{host}/api/v3`. | `https://alm-github.test/api/v3` |
+| `prReviewer.config.providers.github.credential` | GitHub credential container. Only token fields are supported. | `{}` |
+| `prReviewer.config.providers.github.credential.tokenRef` | Environment variable name that stores the GitHub token. | `""` |
+| `prReviewer.config.providers.github.credential.token` | Direct GitHub token (prefer `tokenRef`). | `""` |
 | `prReviewer.config.providers.jira` | Jira provider configuration container. | `{}` |
-| `prReviewer.config.providers.jira.domain` | Jira base URL used in real-provider mode. | `https://your-domain.atlassian.net` |
+| `prReviewer.config.providers.jira.domain` | Jira base URL used in real-provider mode. Must match `https://{host}/jira` or `.../jira/rest/api/2`. | `https://alm-jira.test/jira` |
 | `prReviewer.config.providers.jira.credential` | Jira credential container. Only token fields are supported. | `{}` |
 | `prReviewer.config.providers.jira.credential.tokenRef` | Environment variable name that stores the Jira token. | `""` |
 | `prReviewer.config.providers.jira.credential.token` | Direct Jira token (prefer `tokenRef`). | `""` |
 | `prReviewer.config.providers.confluence` | Confluence provider configuration container. | `{}` |
-| `prReviewer.config.providers.confluence.domain` | Confluence base URL used in real-provider mode (usually ends with `/wiki`). | `https://your-domain.atlassian.net/wiki` |
+| `prReviewer.config.providers.confluence.domain` | Confluence base URL used in real-provider mode. Must match `https://{host}/confluence` or `.../confluence/rest/api`. | `https://alm-confluence.test/confluence` |
 | `prReviewer.config.providers.confluence.credential` | Confluence credential container. Only token fields are supported. | `{}` |
 | `prReviewer.config.providers.confluence.credential.tokenRef` | Environment variable name that stores the Confluence token. | `""` |
 | `prReviewer.config.providers.confluence.credential.token` | Direct Confluence token (prefer `tokenRef`). | `""` |
@@ -300,7 +302,7 @@ All settings are under `prReviewer.config`.
 
 Notes:
 
-- `tokenRef/usernameRef/passwordRef` resolve from environment variables whose names equal the `*Ref` values.
+- `tokenRef` resolves from environment variables whose names equal the `*Ref` values.
 - `prReviewer.config.providers.disableTlsValidation` only affects real-provider mode (`prReviewer.config.providers.useDemoData=false`).
 - Prefer `*Ref` fields over direct credentials in `settings.json`.
 
@@ -313,20 +315,19 @@ Notes:
       "useDemoData": false,
       "disableTlsValidation": false,
       "github": {
-        "domain": "https://api.github.com",
+        "domain": "https://alm-github.test/api/v3",
         "credential": {
-          "usernameRef": "github_user",
-          "passwordRef": "github_pass"
+          "tokenRef": "github_token"
         }
       },
       "jira": {
-        "domain": "https://acme.atlassian.net",
+        "domain": "https://alm-jira.test/jira",
         "credential": {
           "tokenRef": "jira_token"
         }
       },
       "confluence": {
-        "domain": "https://acme.atlassian.net/wiki",
+        "domain": "https://alm-confluence.test/confluence",
         "credential": {
           "tokenRef": "confluence_token"
         }

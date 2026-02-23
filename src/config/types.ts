@@ -3,10 +3,6 @@ import type { ScoreDimension } from "../domain/types.js";
 export interface ProviderCredentialConfig {
   tokenRef?: string;
   token?: string;
-  usernameRef?: string;
-  username?: string;
-  passwordRef?: string;
-  password?: string;
 }
 
 export interface ProviderConnectionConfig {

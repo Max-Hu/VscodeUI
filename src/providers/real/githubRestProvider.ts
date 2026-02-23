@@ -11,7 +11,7 @@ export class GithubRestProvider implements IGithubProvider {
   constructor(connection: ProviderConnectionConfig, options?: { disableTlsValidation?: boolean }) {
     this.client = new HttpJsonClient({
       providerName: "GitHub",
-      baseUrl: connection.domain,
+      baseUrl: normalizeGithubApiBase(connection.domain),
       credential: connection.credential,
       disableTlsValidation: options?.disableTlsValidation,
       defaultHeaders: {
@@ -112,6 +112,23 @@ export class GithubRestProvider implements IGithubProvider {
     }
     return result;
   }
+}
+
+function normalizeGithubApiBase(domain: string): string {
+  const normalized = domain.trim().replace(/\/+$/, "");
+  if (!normalized) {
+    return normalized;
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(normalized);
+  } catch {
+    throw new Error("GitHub provider domain must be a valid URL and match https://{host}/api/v3.");
+  }
+  if (!/\/api\/v3$/i.test(parsed.pathname.replace(/\/+$/, ""))) {
+    throw new Error("GitHub provider domain must match https://{host}/api/v3.");
+  }
+  return normalized;
 }
 
 function mapCheckRun(raw: any): PullRequestCheck {

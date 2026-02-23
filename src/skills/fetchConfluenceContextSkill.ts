@@ -21,9 +21,8 @@ export class FetchConfluenceContextSkill
   async run(input: FetchConfluenceContextInput, context: SkillContext): Promise<FetchConfluenceContextOutput> {
     const issueLinks = input.jiraContext.issues.flatMap((issue) => issue.links ?? []);
     const prLinks = input.githubContext.signals.confluenceLinks;
-    const confluenceDomain = context.config.providers.confluence.domain;
     const strongLinkedUrls = uniqueStrings(
-      [...issueLinks, ...prLinks].filter((url) => isConfluenceUrl(url, confluenceDomain))
+      [...issueLinks, ...prLinks].filter((url) => isConfluenceUrl(url))
     );
 
     const directPages = await context.providers.confluence.getPagesByUrls(strongLinkedUrls, {
@@ -88,25 +87,29 @@ function dedupePages(pages: ConfluencePageContext[]): ConfluencePageContext[] {
   return deduped;
 }
 
-function isConfluenceUrl(value: string, configuredConfluenceDomain: string): boolean {
+function isConfluenceUrl(value: string): boolean {
   try {
     const parsed = new URL(value);
     if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
       return false;
     }
 
-    const normalizedHost = parsed.hostname.toLowerCase();
     const normalizedPath = parsed.pathname.toLowerCase();
-    const configuredHost = getConfiguredHost(configuredConfluenceDomain);
-    if (configuredHost && normalizedHost === configuredHost) {
+    const hasPageId = parsed.searchParams.has("pageId");
+    if (hasPageId) {
       return true;
     }
 
-    // Fallback heuristics for mixed environments and partial settings.
-    if (normalizedHost.includes("confluence")) {
+    if (normalizedPath.includes("/wiki/") || normalizedPath.endsWith("/wiki")) {
       return true;
     }
-    if (normalizedPath.includes("/wiki/") || normalizedPath.endsWith("/wiki")) {
+    if (normalizedPath.includes("/pages/")) {
+      return true;
+    }
+    if (normalizedPath.includes("/spaces/")) {
+      return true;
+    }
+    if (normalizedPath.includes("/display/")) {
       return true;
     }
 
@@ -118,17 +121,4 @@ function isConfluenceUrl(value: string, configuredConfluenceDomain: string): boo
 
 function uniqueStrings(items: string[]): string[] {
   return [...new Set(items.map((item) => item.trim()).filter(Boolean))];
-}
-
-function getConfiguredHost(domain: string): string | undefined {
-  const trimmed = domain.trim();
-  if (!trimmed) {
-    return undefined;
-  }
-  try {
-    const parsed = new URL(trimmed.startsWith("http://") || trimmed.startsWith("https://") ? trimmed : `https://${trimmed}`);
-    return parsed.hostname.toLowerCase();
-  } catch {
-    return undefined;
-  }
 }

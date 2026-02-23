@@ -8,15 +8,15 @@ export const defaultStage1Config: Stage1Config = {
   jiraKeyPattern: "[A-Z][A-Z0-9]+-\\d+",
   providers: {
     github: {
-      domain: "https://api.github.com",
+      domain: "https://alm-github.test/api/v3",
       credential: {}
     },
     jira: {
-      domain: "https://your-domain.atlassian.net",
+      domain: "https://alm-jira.test/jira",
       credential: {}
     },
     confluence: {
-      domain: "https://your-domain.atlassian.net/wiki",
+      domain: "https://alm-confluence.test/confluence",
       credential: {}
     }
   },

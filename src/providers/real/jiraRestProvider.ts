@@ -14,7 +14,7 @@ export class JiraRestProvider implements IJiraProvider {
   constructor(connection: ProviderConnectionConfig, options?: { disableTlsValidation?: boolean }) {
     this.client = new HttpJsonClient({
       providerName: "Jira",
-      baseUrl: connection.domain,
+      baseUrl: resolveJiraApiBase(connection.domain),
       credential: connection.credential,
       disableTlsValidation: options?.disableTlsValidation
     });
@@ -72,7 +72,7 @@ export class JiraRestProvider implements IJiraProvider {
 
   private async fetchIssue(key: string): Promise<any | undefined> {
     try {
-      return await this.client.requestJson<any>(`/rest/api/3/issue/${encodeURIComponent(key)}`, {
+      return await this.client.requestJson<any>(`/issue/${encodeURIComponent(key)}`, {
         query: {
           fields:
             "summary,description,parent,subtasks,issuelinks"
@@ -89,9 +89,7 @@ export class JiraRestProvider implements IJiraProvider {
 
   private async fetchRemoteLinks(key: string): Promise<string[]> {
     try {
-      const response = await this.client.requestJson<any[]>(
-        `/rest/api/3/issue/${encodeURIComponent(key)}/remotelink`
-      );
+      const response = await this.client.requestJson<any[]>(`/issue/${encodeURIComponent(key)}/remotelink`);
       if (!Array.isArray(response)) {
         return [];
       }
@@ -102,6 +100,28 @@ export class JiraRestProvider implements IJiraProvider {
       return [];
     }
   }
+}
+
+function resolveJiraApiBase(domain: string): string {
+  const normalized = domain.trim().replace(/\/+$/, "");
+  if (!normalized) {
+    return normalized;
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(normalized);
+  } catch {
+    throw new Error("Jira provider domain must be a valid URL and match https://{host}/jira.");
+  }
+
+  const pathname = parsed.pathname.replace(/\/+$/, "");
+  if (/\/jira\/rest\/api\/2$/i.test(pathname)) {
+    return normalized;
+  }
+  if (/\/jira$/i.test(pathname)) {
+    return `${normalized}/rest/api/2`;
+  }
+  throw new Error("Jira provider domain must match https://{host}/jira or https://{host}/jira/rest/api/2.");
 }
 
 function mapIssue(raw: any, remoteLinks: string[]): JiraIssueContext {

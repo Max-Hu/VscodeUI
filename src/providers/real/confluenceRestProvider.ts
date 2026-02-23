@@ -8,11 +8,12 @@ export class ConfluenceRestProvider implements IConfluenceProvider {
   private readonly baseDomain: string;
 
   constructor(connection: ProviderConnectionConfig, options?: { disableTlsValidation?: boolean }) {
-    const baseDomain = normalizeDomain(connection.domain);
+    const normalizedDomain = normalizeDomain(connection.domain);
+    const baseDomain = resolveConfluenceSiteBase(normalizedDomain);
     this.baseDomain = baseDomain;
     this.client = new HttpJsonClient({
       providerName: "Confluence",
-      baseUrl: resolveConfluenceApiBase(baseDomain),
+      baseUrl: resolveConfluenceApiBase(normalizedDomain),
       credential: connection.credential,
       disableTlsValidation: options?.disableTlsValidation
     });
@@ -68,7 +69,7 @@ export class ConfluenceRestProvider implements IConfluenceProvider {
       const webUi = asString(item?._links?.webui);
       const resultUrl = webUi
         ? `${stripTrailingSlash(asString(item?._links?.base, this.baseDomain))}${webUi}`
-        : `${this.baseDomain}/wiki/pages/${asString(item?.id)}`;
+        : `${this.baseDomain}/pages/${asString(item?.id)}`;
 
       return {
         id: asString(item?.id),
@@ -83,19 +84,34 @@ export class ConfluenceRestProvider implements IConfluenceProvider {
 
 function resolveConfluenceApiBase(domain: string): string {
   const normalized = stripTrailingSlash(domain);
-  if (normalized.endsWith("/wiki")) {
+  if (normalized.endsWith("/confluence/rest/api")) {
+    return normalized;
+  }
+  if (normalized.endsWith("/confluence")) {
     return `${normalized}/rest/api`;
   }
-  if (normalized.includes("/wiki/")) {
+  if (normalized.includes("/confluence/") && !/\/rest\/api$/i.test(normalized)) {
     return `${normalized.replace(/\/+$/, "")}/rest/api`;
   }
-  return `${normalized}/wiki/rest/api`;
+  throw new Error("Confluence provider domain must match https://{host}/confluence or https://{host}/confluence/rest/api.");
+}
+
+function resolveConfluenceSiteBase(domain: string): string {
+  const normalized = stripTrailingSlash(domain);
+  if (normalized.endsWith("/confluence/rest/api")) {
+    return normalized.replace(/\/rest\/api$/i, "");
+  }
+  return normalized;
 }
 
 function extractConfluencePageId(url: string): string | undefined {
   const pagesMatch = url.match(/\/pages\/(\d+)/);
   if (pagesMatch?.[1]) {
     return pagesMatch[1];
+  }
+  const apiContentMatch = url.match(/\/rest\/api\/content\/(\d+)(?:\/|$)/i);
+  if (apiContentMatch?.[1]) {
+    return apiContentMatch[1];
   }
   try {
     const parsed = new URL(url);

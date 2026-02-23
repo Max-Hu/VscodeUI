@@ -82,48 +82,18 @@ export class HttpJsonClient {
 }
 
 function resolveAuthorizationHeader(credential: ProviderCredentialConfig, providerName: string): string | undefined {
-  if (isGithubProvider(providerName)) {
-    assertGithubCredentialShape(credential, providerName);
-    const username = resolveCredentialValue(credential.username, credential.usernameRef, providerName, "username");
-    const password = resolveCredentialValue(credential.password, credential.passwordRef, providerName, "password");
-    if (!username && !password) {
-      return undefined;
-    }
-    if (!username || !password) {
-      throw new Error(`${providerName} credentials require both username and password.`);
-    }
-    return `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
-  }
-
-  if (isTokenProvider(providerName)) {
-    assertTokenCredentialShape(credential, providerName);
-    const token = resolveCredentialValue(credential.token, credential.tokenRef, providerName, "token");
-    if (!token) {
-      return undefined;
-    }
-    return `Bearer ${token}`;
-  }
-
   const token = resolveCredentialValue(credential.token, credential.tokenRef, providerName, "token");
-  if (token) {
-    return `Bearer ${token}`;
-  }
-  const username = resolveCredentialValue(credential.username, credential.usernameRef, providerName, "username");
-  const password = resolveCredentialValue(credential.password, credential.passwordRef, providerName, "password");
-  if (!username && !password) {
+  if (!token) {
     return undefined;
   }
-  if (!username || !password) {
-    throw new Error(`${providerName} credentials require both username and password.`);
-  }
-  return `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
+  return `Bearer ${token}`;
 }
 
 function resolveCredentialValue(
   direct: string | undefined,
   reference: string | undefined,
   providerName: string,
-  field: "token" | "username" | "password"
+  field: "token"
 ): string | undefined {
   if (direct && direct.trim()) {
     return direct.trim();
@@ -142,31 +112,6 @@ function resolveCredentialValue(
   throw new Error(
     `${providerName} credential reference '${ref}' for '${field}' is not resolved. Set the env var '${ref}' or provide direct credential value.`
   );
-}
-
-function assertGithubCredentialShape(credential: ProviderCredentialConfig, providerName: string): void {
-  if (credential.token || credential.tokenRef) {
-    throw new Error(
-      `${providerName} only supports username/password credentials in this build. Remove token/tokenRef from prReviewer.config.providers.github.credential.`
-    );
-  }
-}
-
-function assertTokenCredentialShape(credential: ProviderCredentialConfig, providerName: string): void {
-  if (credential.username || credential.usernameRef || credential.password || credential.passwordRef) {
-    throw new Error(
-      `${providerName} only supports token credentials in this build. Remove username/password fields from prReviewer.config.providers.${providerName.toLowerCase()}.credential.`
-    );
-  }
-}
-
-function isGithubProvider(providerName: string): boolean {
-  return providerName.toLowerCase() === "github";
-}
-
-function isTokenProvider(providerName: string): boolean {
-  const normalized = providerName.toLowerCase();
-  return normalized === "jira" || normalized === "confluence";
 }
 
 function buildUrl(baseUrl: string, path: string, query?: Record<string, QueryValue>): string {

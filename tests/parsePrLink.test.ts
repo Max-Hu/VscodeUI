@@ -11,6 +11,15 @@ test("parsePrLink parses valid GitHub pull request URL", () => {
   });
 });
 
+test("parsePrLink parses PR URL on custom host when path format is valid", () => {
+  const parsed = parsePrLink("https://git.example.internal/acme/platform/pull/42");
+  assert.deepEqual(parsed, {
+    owner: "acme",
+    repo: "platform",
+    prNumber: 42
+  });
+});
+
 test("parsePrLink throws on invalid URL", () => {
   assert.throws(() => parsePrLink("https://gitlab.com/acme/platform/-/merge_requests/42"), PrLinkParseError);
 });

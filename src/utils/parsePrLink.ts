@@ -15,13 +15,9 @@ export function parsePrLink(prLink: string): PrReference {
     throw new PrLinkParseError("PR link is not a valid URL.");
   }
 
-  if (url.hostname !== "github.com") {
-    throw new PrLinkParseError("Only GitHub PR links are supported.");
-  }
-
   const match = url.pathname.match(/^\/([^/]+)\/([^/]+)\/pull\/(\d+)\/?$/);
   if (!match) {
-    throw new PrLinkParseError("PR link must match https://github.com/{owner}/{repo}/pull/{number}.");
+    throw new PrLinkParseError("PR link must match https://{host}/{owner}/{repo}/pull/{number}.");
   }
 
   const [, owner, repo, prNumberText] = match;

@@ -6,20 +6,19 @@ test("buildStage1ConfigPatchFromStructuredSettings maps structured providers and
   const patch = buildStage1ConfigPatchFromStructuredSettings({
     providers: {
       github: {
-        domain: "https://api.github.com",
+        domain: "https://alm-github.test/api/v3",
         credential: {
-          usernameRef: "github_user",
-          passwordRef: "github_pass"
+          tokenRef: "github_token"
         }
       },
       jira: {
-        domain: "https://acme.atlassian.net",
+        domain: "https://alm-jira.test/jira",
         credential: {
           tokenRef: "jira_token"
         }
       },
       confluence: {
-        domain: "https://acme.atlassian.net/wiki",
+        domain: "https://alm-confluence.test/confluence",
         credential: {
           tokenRef: "confluence_token"
         }
@@ -44,20 +43,19 @@ test("buildStage1ConfigPatchFromStructuredSettings maps structured providers and
   assert.deepEqual(patch, {
     providers: {
       github: {
-        domain: "https://api.github.com",
+        domain: "https://alm-github.test/api/v3",
         credential: {
-          usernameRef: "github_user",
-          passwordRef: "github_pass"
+          tokenRef: "github_token"
         }
       },
       jira: {
-        domain: "https://acme.atlassian.net",
+        domain: "https://alm-jira.test/jira",
         credential: {
           tokenRef: "jira_token"
         }
       },
       confluence: {
-        domain: "https://acme.atlassian.net/wiki",
+        domain: "https://alm-confluence.test/confluence",
         credential: {
           tokenRef: "confluence_token"
         }
@@ -100,19 +98,20 @@ test("buildStage1ConfigPatchFromStructuredSettings ignores non-object root", () 
   assert.deepEqual(buildStage1ConfigPatchFromStructuredSettings(undefined), {});
 });
 
-test("buildStage1ConfigPatchFromStructuredSettings rejects github token credentials", () => {
+test("buildStage1ConfigPatchFromStructuredSettings rejects github basic credentials", () => {
   assert.throws(
     () =>
       buildStage1ConfigPatchFromStructuredSettings({
         providers: {
           github: {
             credential: {
-              tokenRef: "github_pat"
+              usernameRef: "github_user",
+              passwordRef: "github_pass"
             }
           }
         }
       }),
-    /github\.credential only supports username\/password/i
+    /github\.credential only supports token/i
   );
 });
 
@@ -147,5 +146,22 @@ test("buildStage1ConfigPatchFromStructuredSettings rejects legacy credential.mod
         }
       }),
     /credential\.mode is not supported/i
+  );
+});
+
+test("buildStage1ConfigPatchFromStructuredSettings rejects unsupported provider domain shapes", () => {
+  assert.throws(
+    () =>
+      buildStage1ConfigPatchFromStructuredSettings({
+        providers: {
+          github: {
+            domain: "https://alm-github.test",
+            credential: {
+              tokenRef: "github_token"
+            }
+          }
+        }
+      }),
+    /github\.domain must match .*\/api\/v3/i
   );
 });
