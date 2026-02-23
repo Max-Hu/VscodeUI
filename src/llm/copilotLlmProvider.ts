@@ -21,8 +21,15 @@ export class CopilotLlmProvider implements ILlmProvider {
       );
     }
 
+    const availableModelLabels = models.map((candidate, index) => `${index}: ${toModelLabel(candidate)}`);
+    const uniqueModelLabels = [...new Set(models.map((candidate) => toModelLabel(candidate)))];
+    console.log(
+      `[Copilot] available models total=${models.length} unique=${uniqueModelLabels.length} labels=${availableModelLabels.join(", ")}`
+    );
+
     const model = models[0];
     this.lastModelLabel = toModelLabel(model);
+    console.log(`[Copilot] selected model=${this.lastModelLabel}`);
     const message = vscode.LanguageModelChatMessage?.User
       ? vscode.LanguageModelChatMessage.User(prompt)
       : { role: "user", content: prompt };
