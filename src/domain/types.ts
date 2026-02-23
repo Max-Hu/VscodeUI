@@ -4,6 +4,7 @@ export interface ReviewRequest {
   prLink: string;
   reviewProfile?: ReviewProfile;
   additionalKeywords?: string[];
+  copilotModelId?: string;
 }
 
 export interface PrReference {

@@ -29,6 +29,10 @@ export async function routePanelMessage(
       };
     }
 
+    if (message.type !== "publish-review") {
+      throw new Error("Unsupported panel message type.");
+    }
+
     const publishRequest = toPublishRequest(message);
     const publishResult = await deps.publishEditedComment(publishRequest);
     return {
@@ -52,9 +56,11 @@ function toReviewRequest(message: Extract<PanelInboundMessage, { type: "start-re
   if (!prLink) {
     throw new Error("PR link is required.");
   }
+  const copilotModelId = asNonEmptyString(message.payload?.copilotModelId);
 
   return {
-    prLink
+    prLink,
+    ...(copilotModelId ? { copilotModelId } : {})
   };
 }
 

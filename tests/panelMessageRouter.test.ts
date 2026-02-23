@@ -83,6 +83,34 @@ test("routePanelMessage routes start-review and returns review-completed", async
   assert.equal(outbound.type, "review-completed");
 });
 
+test("routePanelMessage passes selected copilot model id in start-review request", async () => {
+  let capturedRequest: ReviewRequest | undefined;
+
+  await routePanelMessage(
+    {
+      type: "start-review",
+      payload: {
+        prLink: "https://github.com/acme/platform/pull/42",
+        copilotModelId: "copilot/gpt-4.1"
+      }
+    },
+    {
+      async runReview(request) {
+        capturedRequest = request;
+        return buildStage3Result();
+      },
+      async publishEditedComment() {
+        throw new Error("not used");
+      }
+    }
+  );
+
+  assert.deepEqual(capturedRequest, {
+    prLink: "https://github.com/acme/platform/pull/42",
+    copilotModelId: "copilot/gpt-4.1"
+  });
+});
+
 test("routePanelMessage routes publish-review and returns publish-completed", async () => {
   let capturedRequest: PublishCommentRequest | undefined;
 

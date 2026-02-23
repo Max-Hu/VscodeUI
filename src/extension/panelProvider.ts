@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { loadStage1ConfigPatchFromVsCodeSettings } from "../config/vscodeSettings.js";
 import type { Stage1ConfigPatch } from "../config/types.js";
+import { CopilotLlmProvider, listCopilotChatModels } from "../llm/copilotLlmProvider.js";
 import { PanelReviewObserver } from "../observability/panelReviewObserver.js";
 import type { ReviewEvent } from "../observability/reviewObserver.js";
 import { Stage1ReviewOrchestrator } from "../orchestrator/reviewOrchestrator.js";
@@ -44,9 +45,13 @@ export class PrReviewerPanelProvider implements vscode.WebviewViewProvider {
     if (verboseLogs) {
       this.outputChannel.appendLine(`[panel] inbound payload: ${safeStringify(message)}`);
     }
+    if (isListCopilotModelsMessage(message)) {
+      await this.postCopilotModels();
+      return;
+    }
     const outbound = await routePanelMessage(message, {
       runReview: async (request) => {
-        const orchestrator = await this.createOrchestrator();
+        const orchestrator = await this.createOrchestrator({ copilotModelId: request.copilotModelId });
         return orchestrator.run(request);
       },
       publishEditedComment: async (request) => {
@@ -62,7 +67,7 @@ export class PrReviewerPanelProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private async createOrchestrator(): Promise<Stage1ReviewOrchestrator> {
+  private async createOrchestrator(options?: { copilotModelId?: string }): Promise<Stage1ReviewOrchestrator> {
     const configuration = vscode.workspace.getConfiguration(PR_REVIEWER_SETTINGS_SECTION);
     const structuredConfig = configuration.get("config");
     let configPatch: Stage1ConfigPatch = {};
@@ -92,6 +97,13 @@ export class PrReviewerPanelProvider implements vscode.WebviewViewProvider {
     if (verboseLogs) {
       this.outputChannel.appendLine(`[config] effective config patch: ${safeStringify(configPatch)}`);
     }
+    const llmProvider =
+      llmMode === "copilot" && options?.copilotModelId
+        ? new CopilotLlmProvider({ preferredModelId: options.copilotModelId })
+        : undefined;
+    if (llmProvider) {
+      this.outputChannel.appendLine(`[config] selected copilot model id=${options?.copilotModelId}`);
+    }
 
     const reviewObserver = new PanelReviewObserver({
       log: (line) => this.outputChannel.appendLine(`[pipeline] ${line}`),
@@ -107,9 +119,42 @@ export class PrReviewerPanelProvider implements vscode.WebviewViewProvider {
       githubProvider: providers.githubProvider,
       jiraProvider: providers.jiraProvider,
       confluenceProvider: providers.confluenceProvider,
+      llmProvider,
       config: configPatch,
       reviewObserver
     });
+  }
+
+  private async postCopilotModels(): Promise<void> {
+    try {
+      const models = await listCopilotChatModels();
+      const outbound: PanelOutboundMessage = {
+        type: "copilot-models",
+        payload: {
+          models: models.map((item) => ({
+            id: item.id,
+            label: item.label,
+            ...(item.name ? { name: item.name } : {}),
+            ...(item.family ? { family: item.family } : {}),
+            ...(item.version ? { version: item.version } : {}),
+            ...(item.reasoningEffort ? { reasoningEffort: item.reasoningEffort } : {})
+          }))
+        }
+      };
+      await this.webviewView?.webview.postMessage(outbound);
+      this.outputChannel.appendLine(`[panel] outbound message posted: copilot-models (${models.length} models)`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to load Copilot models.";
+      const outbound: PanelOutboundMessage = {
+        type: "copilot-models",
+        payload: {
+          models: [],
+          error: message
+        }
+      };
+      await this.webviewView?.webview.postMessage(outbound);
+      this.outputChannel.appendLine(`[panel] outbound message posted: copilot-models error=${message}`);
+    }
   }
 
   private async postProgressEvent(event: ReviewEvent, text: string): Promise<void> {
@@ -156,4 +201,8 @@ function getNestedValue(root: unknown, path: string): unknown {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function isListCopilotModelsMessage(value: unknown): value is PanelInboundMessage & { type: "list-copilot-models" } {
+  return Boolean(value && typeof value === "object" && (value as { type?: unknown }).type === "list-copilot-models");
 }

@@ -157,6 +157,17 @@ export function getPanelHtml(nonce: string): string {
   </div>
 
   <div class="card">
+    <label for="copilotModel">Copilot Model (analysis)</label>
+    <div class="row">
+      <select id="copilotModel" aria-label="Copilot model">
+        <option value="">Loading models...</option>
+      </select>
+      <button id="refreshModelsBtn" type="button">Refresh Models</button>
+    </div>
+    <div id="modelStatus" class="status"></div>
+  </div>
+
+  <div class="card">
     <label for="progress">Runtime Progress</label>
     <div id="progress" class="progress" aria-live="polite"></div>
   </div>
@@ -173,9 +184,19 @@ export function getPanelHtml(nonce: string): string {
 
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
-    const state = { prLink: "", canPublish: false, publishArmed: false, progressLines: 0 };
+    const state = {
+      prLink: "",
+      canPublish: false,
+      publishArmed: false,
+      progressLines: 0,
+      copilotModels: [],
+      selectedCopilotModelId: ""
+    };
     const els = {
       prLink: document.getElementById("prLink"),
+      copilotModel: document.getElementById("copilotModel"),
+      refreshModelsBtn: document.getElementById("refreshModelsBtn"),
+      modelStatus: document.getElementById("modelStatus"),
       draft: document.getElementById("draft"),
       reviewBtn: document.getElementById("reviewBtn"),
       publishBtn: document.getElementById("publishBtn"),
@@ -189,6 +210,11 @@ export function getPanelHtml(nonce: string): string {
     function setStatus(text, cls) {
       els.status.textContent = text || "";
       els.status.className = "status" + (cls ? " " + cls : "");
+    }
+
+    function setModelStatus(text, cls) {
+      els.modelStatus.textContent = text || "";
+      els.modelStatus.className = "status" + (cls ? " " + cls : "");
     }
 
     function setPublishEnabled(enabled) {
@@ -226,6 +252,64 @@ export function getPanelHtml(nonce: string): string {
       }
 
       els.progress.scrollTop = els.progress.scrollHeight;
+    }
+
+    function setCopilotModelLoading(loading) {
+      els.copilotModel.disabled = Boolean(loading);
+      els.refreshModelsBtn.disabled = Boolean(loading);
+      els.refreshModelsBtn.setAttribute("aria-disabled", String(Boolean(loading)));
+      if (loading) {
+        els.refreshModelsBtn.textContent = "Loading...";
+      } else {
+        els.refreshModelsBtn.textContent = "Refresh Models";
+      }
+    }
+
+    function renderCopilotModels(models, error) {
+      const previous = state.selectedCopilotModelId;
+      state.copilotModels = Array.isArray(models) ? models : [];
+      els.copilotModel.innerHTML = "";
+
+      if (!state.copilotModels.length) {
+        const option = document.createElement("option");
+        option.value = "";
+        option.textContent = error ? "No Copilot models available" : "No models";
+        els.copilotModel.appendChild(option);
+        state.selectedCopilotModelId = "";
+        setModelStatus(error || "No Copilot models found.", error ? "error" : "warn");
+        return;
+      }
+
+      for (const model of state.copilotModels) {
+        const option = document.createElement("option");
+        option.value = model.id || "";
+        option.textContent = model.label || model.id || "unknown model";
+        if (model.reasoningEffort) {
+          option.title = "Reasoning effort: " + model.reasoningEffort;
+        }
+        els.copilotModel.appendChild(option);
+      }
+
+      const resolved =
+        state.copilotModels.find((m) => m.id === previous)?.id ||
+        state.copilotModels[0].id ||
+        "";
+      els.copilotModel.value = resolved;
+      state.selectedCopilotModelId = resolved;
+      const selected = state.copilotModels.find((m) => m.id === resolved);
+      setModelStatus(
+        "Selected: " + ((selected && selected.label) || resolved) + " | available=" + state.copilotModels.length,
+        "ok"
+      );
+    }
+
+    function requestCopilotModels() {
+      setCopilotModelLoading(true);
+      setModelStatus("Loading Copilot models...", "");
+      vscode.postMessage({
+        type: "list-copilot-models",
+        payload: {}
+      });
     }
 
     function toProgressSummary(event, fallbackText) {
@@ -272,7 +356,10 @@ export function getPanelHtml(nonce: string): string {
       setStatus("Running review...", "");
       vscode.postMessage({
         type: "start-review",
-        payload: { prLink }
+        payload: {
+          prLink,
+          copilotModelId: state.selectedCopilotModelId || undefined
+        }
       });
     }
 
@@ -311,6 +398,14 @@ export function getPanelHtml(nonce: string): string {
 
     els.reviewBtn.addEventListener("click", runReview);
     els.publishBtn.addEventListener("click", publish);
+    els.refreshModelsBtn.addEventListener("click", requestCopilotModels);
+    els.copilotModel.addEventListener("change", () => {
+      state.selectedCopilotModelId = (els.copilotModel.value || "").trim();
+      const selected = state.copilotModels.find((m) => m.id === state.selectedCopilotModelId);
+      if (selected) {
+        setModelStatus("Selected: " + selected.label, "ok");
+      }
+    });
     els.draft.addEventListener("input", () => {
       if (state.publishArmed) {
         state.publishArmed = false;
@@ -342,10 +437,19 @@ export function getPanelHtml(nonce: string): string {
         const errorMessage = message.payload?.message || "Request failed.";
         appendProgress(errorMessage, "error");
         setStatus(errorMessage, "error");
+      } else if (message.type === "copilot-models") {
+        setCopilotModelLoading(false);
+        renderCopilotModels(message.payload?.models || [], message.payload?.error || "");
+        if (message.payload?.error) {
+          appendProgress("Copilot model list failed: " + message.payload.error, "warn");
+        } else {
+          appendProgress("Loaded Copilot models: " + String((message.payload?.models || []).length), "info");
+        }
       }
     });
 
     setPublishEnabled(false);
+    requestCopilotModels();
   </script>
 </body>
 </html>`;
