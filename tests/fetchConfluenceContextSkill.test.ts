@@ -38,7 +38,14 @@ test("FetchConfluenceContextSkill prefers strong links and performs query expans
   const context: SkillContext = {
     config: {
       ...defaultStage1Config,
-      topK: 10
+      topK: 10,
+      providers: {
+        ...defaultStage1Config.providers,
+        confluence: {
+          ...defaultStage1Config.providers.confluence,
+          enableExpandedSearch: true
+        }
+      }
     },
     providers: {
       github: {
@@ -279,5 +286,91 @@ test("FetchConfluenceContextSkill accepts confluence-like paths on custom hosts 
   assert.deepEqual(capturedUrls[0], [
     "https://docs.internal.local/pages/viewpage.action?pageId=12345",
     "https://docs.internal.local/wiki/spaces/ENG/pages/101"
+  ]);
+});
+
+test("FetchConfluenceContextSkill disables expanded query search by default and only fetches links with page IDs", async () => {
+  const capturedUrls: string[][] = [];
+  let searchCallCount = 0;
+  const context: SkillContext = {
+    config: {
+      ...defaultStage1Config
+    },
+    providers: {
+      github: {
+        async getPullRequest() {
+          throw new Error("not used");
+        },
+        async publishReviewComment() {
+          throw new Error("not used");
+        }
+      },
+      jira: {
+        async getIssues() {
+          throw new Error("not used");
+        }
+      },
+      confluence: {
+        async getPagesByUrls(urls: string[]) {
+          capturedUrls.push(urls);
+          return [];
+        },
+        async searchPages() {
+          searchCallCount += 1;
+          return [];
+        }
+      }
+    }
+  };
+
+  const skill = new FetchConfluenceContextSkill();
+  const result = await skill.run(
+    {
+      githubContext: {
+        metadata: {
+          title: "CDPS-999",
+          body: "",
+          author: "alice",
+          baseBranch: "main",
+          headBranch: "feature",
+          url: "https://alm-github.test/acme/platform/pull/42"
+        },
+        files: [],
+        commits: [],
+        checks: [],
+        comments: [],
+        signals: {
+          confluenceLinks: [
+            "https://alm-confluence.test/confluence/display/ENG/Runbook",
+            "https://alm-confluence.test/confluence/rest/api/content/22222"
+          ],
+          keywords: ["retry"]
+        }
+      },
+      jiraContext: {
+        requestedKeys: ["CDPS-999"],
+        issues: [
+          {
+            key: "CDPS-999",
+            summary: "Issue summary",
+            description: "",
+            acceptanceCriteria: ["retry"],
+            nfr: [],
+            risks: [],
+            testingRequirements: [],
+            links: ["https://alm-confluence.test/confluence/pages/viewpage.action?pageId=33333"]
+          }
+        ]
+      }
+    },
+    context
+  );
+
+  assert.equal(searchCallCount, 0);
+  assert.deepEqual(result.confluence.searchQueries, []);
+  assert.equal(capturedUrls.length, 1);
+  assert.deepEqual(capturedUrls[0], [
+    "https://alm-confluence.test/confluence/pages/viewpage.action?pageId=33333",
+    "https://alm-confluence.test/confluence/rest/api/content/22222"
   ]);
 });

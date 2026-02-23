@@ -21,9 +21,10 @@ export class FetchConfluenceContextSkill
   async run(input: FetchConfluenceContextInput, context: SkillContext): Promise<FetchConfluenceContextOutput> {
     const issueLinks = input.jiraContext.issues.flatMap((issue) => issue.links ?? []);
     const prLinks = input.githubContext.signals.confluenceLinks;
-    const strongLinkedUrls = uniqueStrings(
+    const confluenceLikeLinks = uniqueStrings(
       [...issueLinks, ...prLinks].filter((url) => isConfluenceUrl(url))
     );
+    const strongLinkedUrls = confluenceLikeLinks.filter(hasConfluencePageId);
 
     const directPages = await context.providers.confluence.getPagesByUrls(strongLinkedUrls, {
       expandDepth: context.config.expandDepth
@@ -33,22 +34,27 @@ export class FetchConfluenceContextSkill
       source: issueLinks.includes(page.url) ? ("issue-link" as const) : ("pr-link" as const)
     }));
 
-    const queryCandidates = uniqueStrings([
-      ...input.jiraContext.requestedKeys,
-      ...input.jiraContext.issues.map((issue) => issue.summary),
-      ...input.jiraContext.issues.flatMap((issue) => issue.acceptanceCriteria),
-      ...input.githubContext.signals.keywords
-    ]).filter((query) => query.length >= 3);
+    const expandedSearchEnabled = context.config.providers.confluence.enableExpandedSearch ?? false;
+    const queryCandidates = expandedSearchEnabled
+      ? uniqueStrings([
+          ...input.jiraContext.requestedKeys,
+          ...input.jiraContext.issues.map((issue) => issue.summary),
+          ...input.jiraContext.issues.flatMap((issue) => issue.acceptanceCriteria),
+          ...input.githubContext.signals.keywords
+        ]).filter((query) => query.length >= 3)
+      : [];
 
-    const searchQueries = queryCandidates.slice(0, Math.max(context.config.topK, 12));
-    const searchResults = await Promise.all(
-      searchQueries.map((query) =>
-        context.providers.confluence.searchPages(query, {
-          topK: Math.max(Math.floor(context.config.topK / 2), 3),
-          expandDepth: context.config.expandDepth
-        })
-      )
-    );
+    const searchQueries = expandedSearchEnabled ? queryCandidates.slice(0, Math.max(context.config.topK, 12)) : [];
+    const searchResults = expandedSearchEnabled
+      ? await Promise.all(
+          searchQueries.map((query) =>
+            context.providers.confluence.searchPages(query, {
+              topK: Math.max(Math.floor(context.config.topK / 2), 3),
+              expandDepth: context.config.expandDepth
+            })
+          )
+        )
+      : [];
 
     const taggedSearchedPages = searchResults.flatMap((pages, index) => {
       const query = searchQueries[index].toUpperCase();
@@ -69,6 +75,22 @@ export class FetchConfluenceContextSkill
         pages: allPages
       }
     };
+  }
+}
+
+function hasConfluencePageId(value: string): boolean {
+  if (/\/rest\/api\/content\/\d+(?:\/|$)/i.test(value)) {
+    return true;
+  }
+  if (/\/pages\/\d+(?:\/|$)/i.test(value)) {
+    return true;
+  }
+  try {
+    const parsed = new URL(value);
+    const pageId = parsed.searchParams.get("pageId");
+    return Boolean(pageId && /^\d+$/.test(pageId));
+  } catch {
+    return false;
   }
 }
 
@@ -101,6 +123,9 @@ function isConfluenceUrl(value: string): boolean {
     }
 
     if (normalizedPath.includes("/wiki/") || normalizedPath.endsWith("/wiki")) {
+      return true;
+    }
+    if (/\/rest\/api\/content\/\d+(?:\/|$)/i.test(normalizedPath)) {
       return true;
     }
     if (normalizedPath.includes("/pages/")) {

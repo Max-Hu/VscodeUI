@@ -8,6 +8,7 @@ export interface ProviderCredentialConfig {
 export interface ProviderConnectionConfig {
   domain: string;
   credential: ProviderCredentialConfig;
+  enableExpandedSearch?: boolean;
 }
 
 export interface Stage1Config {

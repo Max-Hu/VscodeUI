@@ -284,6 +284,7 @@ All settings are under `prReviewer.config`.
 | `prReviewer.config.providers.jira.credential.tokenRef` | Jira token value (legacy field name; treated same as `token`). | `""` |
 | `prReviewer.config.providers.jira.credential.token` | Direct Jira token (prefer `tokenRef`). | `""` |
 | `prReviewer.config.providers.confluence` | Confluence provider configuration container. | `{}` |
+| `prReviewer.config.providers.confluence.enableExpandedSearch` | Enable query-based Confluence expanded search. Default `false`. When disabled, only direct links with resolvable page IDs are fetched. | `false` |
 | `prReviewer.config.providers.confluence.domain` | Confluence base URL used in real-provider mode. Must match `https://{host}/confluence` or `.../confluence/rest/api`. | `https://alm-confluence.test/confluence` |
 | `prReviewer.config.providers.confluence.credential` | Confluence credential container. Only token fields are supported. | `{}` |
 | `prReviewer.config.providers.confluence.credential.tokenRef` | Confluence token value (legacy field name; treated same as `token`). | `""` |
@@ -304,6 +305,7 @@ Notes:
 
 - `tokenRef` is treated as a direct token value (legacy field name); it is not resolved from environment variables.
 - `prReviewer.config.providers.disableTlsValidation` only affects real-provider mode (`prReviewer.config.providers.useDemoData=false`).
+- `prReviewer.config.providers.confluence.enableExpandedSearch=false` (default) disables query-based Confluence search. In this mode, Confluence content is fetched only from direct links with resolvable page IDs.
 - Prefer `*Ref` fields over direct credentials in `settings.json`.
 
 ### Example `.vscode/settings.json`
@@ -327,6 +329,7 @@ Notes:
         }
       },
       "confluence": {
+        "enableExpandedSearch": false,
         "domain": "https://alm-confluence.test/confluence",
         "credential": {
           "tokenRef": "confluence_token"

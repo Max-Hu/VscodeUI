@@ -19,6 +19,7 @@ test("buildStage1ConfigPatchFromStructuredSettings maps structured providers and
       },
       confluence: {
         domain: "https://alm-confluence.test/confluence",
+        enableExpandedSearch: true,
         credential: {
           tokenRef: "confluence_token"
         }
@@ -56,6 +57,7 @@ test("buildStage1ConfigPatchFromStructuredSettings maps structured providers and
       },
       confluence: {
         domain: "https://alm-confluence.test/confluence",
+        enableExpandedSearch: true,
         credential: {
           tokenRef: "confluence_token"
         }

@@ -97,13 +97,18 @@ function readProviderConnection(
     assertSupportedProviderDomainShape(domain, provider);
   }
   const credential = readProviderCredential(connection.credential, provider);
+  const enableExpandedSearch =
+    provider === "confluence" ? asBoolean(connection.enableExpandedSearch) : undefined;
   if (!domain && !credential) {
-    return undefined;
+    if (provider !== "confluence" || typeof enableExpandedSearch !== "boolean") {
+      return undefined;
+    }
   }
 
   return {
     domain: domain ?? "",
-    credential: credential ?? {}
+    credential: credential ?? {},
+    ...(provider === "confluence" && typeof enableExpandedSearch === "boolean" ? { enableExpandedSearch } : {})
   };
 }
 

@@ -126,6 +126,11 @@
                   "description": "Confluence provider settings (token auth only).",
                   "additionalProperties": false,
                   "properties": {
+                    "enableExpandedSearch": {
+                      "type": "boolean",
+                      "default": false,
+                      "description": "Enable query-based Confluence expanded search. When false, only direct links with resolvable page IDs are fetched."
+                    },
                     "domain": {
                       "type": "string",
                       "default": "https://alm-confluence.test/confluence",

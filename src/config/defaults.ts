@@ -17,7 +17,8 @@ export const defaultStage1Config: Stage1Config = {
     },
     confluence: {
       domain: "https://alm-confluence.test/confluence",
-      credential: {}
+      credential: {},
+      enableExpandedSearch: false
     }
   },
   llm: {
