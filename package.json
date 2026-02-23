@@ -81,7 +81,7 @@
                         "tokenRef": {
                           "type": "string",
                           "default": "",
-                          "description": "Environment variable name containing GitHub token."
+                          "description": "GitHub token value (legacy field name; treated the same as token)."
                         },
                         "token": {
                           "type": "string",
@@ -110,7 +110,7 @@
                         "tokenRef": {
                           "type": "string",
                           "default": "",
-                          "description": "Environment variable name containing Jira token."
+                          "description": "Jira token value (legacy field name; treated the same as token)."
                         },
                         "token": {
                           "type": "string",
@@ -139,7 +139,7 @@
                         "tokenRef": {
                           "type": "string",
                           "default": "",
-                          "description": "Environment variable name containing Confluence token."
+                          "description": "Confluence token value (legacy field name; treated the same as token)."
                         },
                         "token": {
                           "type": "string",

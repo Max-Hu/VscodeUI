@@ -39,7 +39,7 @@ export class HttpJsonClient {
   ): Promise<T> {
     const method = options?.method ?? "GET";
     const url = buildUrl(this.baseUrl, path, options?.query);
-    const authorization = resolveAuthorizationHeader(this.credential, this.providerName);
+    const authorization = resolveAuthorizationHeader(this.credential);
     const headers: Record<string, string> = {
       Accept: "application/json",
       ...this.defaultHeaders,
@@ -81,20 +81,15 @@ export class HttpJsonClient {
   }
 }
 
-function resolveAuthorizationHeader(credential: ProviderCredentialConfig, providerName: string): string | undefined {
-  const token = resolveCredentialValue(credential.token, credential.tokenRef, providerName, "token");
+function resolveAuthorizationHeader(credential: ProviderCredentialConfig): string | undefined {
+  const token = resolveCredentialValue(credential.token, credential.tokenRef);
   if (!token) {
     return undefined;
   }
   return `Bearer ${token}`;
 }
 
-function resolveCredentialValue(
-  direct: string | undefined,
-  reference: string | undefined,
-  providerName: string,
-  field: "token"
-): string | undefined {
+function resolveCredentialValue(direct: string | undefined, reference: string | undefined): string | undefined {
   if (direct && direct.trim()) {
     return direct.trim();
   }
@@ -102,16 +97,7 @@ function resolveCredentialValue(
     return undefined;
   }
   const ref = reference.trim();
-  if (!ref) {
-    return undefined;
-  }
-  const fromEnv = process.env[ref];
-  if (fromEnv && fromEnv.trim()) {
-    return fromEnv.trim();
-  }
-  throw new Error(
-    `${providerName} credential reference '${ref}' for '${field}' is not resolved. Set the env var '${ref}' or provide direct credential value.`
-  );
+  return ref || undefined;
 }
 
 function buildUrl(baseUrl: string, path: string, query?: Record<string, QueryValue>): string {

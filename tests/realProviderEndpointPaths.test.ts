@@ -45,7 +45,7 @@ test("GithubRestProvider requests endpoints under /api/v3 and uses bearer token"
     const provider = new GithubRestProvider({
       domain: `${baseUrl}/api/v3`,
       credential: {
-        token: "gh_token"
+        tokenRef: "gh_token"
       }
     });
 

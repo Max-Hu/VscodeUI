@@ -226,7 +226,7 @@ code --install-extension pr-reviewer.vsix --force
 3. For demo mode, set `prReviewer.config.providers.useDemoData=true`.
 4. For real mode, set `prReviewer.config.providers.useDemoData=false`.
 5. If real mode is used, configure provider domains and credentials.
-6. If you use `tokenRef`, set matching environment variables before launching VS Code.
+6. Set provider tokens in `token` or `tokenRef` (both are treated as direct token values in current implementation).
 7. Open `PR Reviewer` from the activity bar.
 8. Enter PR link, run review, edit draft, publish.
 
@@ -276,17 +276,17 @@ All settings are under `prReviewer.config`.
 | `prReviewer.config.providers.github` | GitHub provider configuration container. | `{}` |
 | `prReviewer.config.providers.github.domain` | GitHub API base URL used in real-provider mode. Must match `https://{host}/api/v3`. | `https://alm-github.test/api/v3` |
 | `prReviewer.config.providers.github.credential` | GitHub credential container. Only token fields are supported. | `{}` |
-| `prReviewer.config.providers.github.credential.tokenRef` | Environment variable name that stores the GitHub token. | `""` |
+| `prReviewer.config.providers.github.credential.tokenRef` | GitHub token value (legacy field name; treated same as `token`). | `""` |
 | `prReviewer.config.providers.github.credential.token` | Direct GitHub token (prefer `tokenRef`). | `""` |
 | `prReviewer.config.providers.jira` | Jira provider configuration container. | `{}` |
 | `prReviewer.config.providers.jira.domain` | Jira base URL used in real-provider mode. Must match `https://{host}/jira` or `.../jira/rest/api/2`. | `https://alm-jira.test/jira` |
 | `prReviewer.config.providers.jira.credential` | Jira credential container. Only token fields are supported. | `{}` |
-| `prReviewer.config.providers.jira.credential.tokenRef` | Environment variable name that stores the Jira token. | `""` |
+| `prReviewer.config.providers.jira.credential.tokenRef` | Jira token value (legacy field name; treated same as `token`). | `""` |
 | `prReviewer.config.providers.jira.credential.token` | Direct Jira token (prefer `tokenRef`). | `""` |
 | `prReviewer.config.providers.confluence` | Confluence provider configuration container. | `{}` |
 | `prReviewer.config.providers.confluence.domain` | Confluence base URL used in real-provider mode. Must match `https://{host}/confluence` or `.../confluence/rest/api`. | `https://alm-confluence.test/confluence` |
 | `prReviewer.config.providers.confluence.credential` | Confluence credential container. Only token fields are supported. | `{}` |
-| `prReviewer.config.providers.confluence.credential.tokenRef` | Environment variable name that stores the Confluence token. | `""` |
+| `prReviewer.config.providers.confluence.credential.tokenRef` | Confluence token value (legacy field name; treated same as `token`). | `""` |
 | `prReviewer.config.providers.confluence.credential.token` | Direct Confluence token (prefer `tokenRef`). | `""` |
 | `prReviewer.config.llm` | LLM runtime configuration container. | `{}` |
 | `prReviewer.config.llm.mode` | LLM execution mode for scoring/drafting (`copilot` or `mock`). | `copilot` |
@@ -302,7 +302,7 @@ All settings are under `prReviewer.config`.
 
 Notes:
 
-- `tokenRef` resolves from environment variables whose names equal the `*Ref` values.
+- `tokenRef` is treated as a direct token value (legacy field name); it is not resolved from environment variables.
 - `prReviewer.config.providers.disableTlsValidation` only affects real-provider mode (`prReviewer.config.providers.useDemoData=false`).
 - Prefer `*Ref` fields over direct credentials in `settings.json`.
 
@@ -390,7 +390,7 @@ Current tests cover:
 - `prReviewer.config.providers.useDemoData=true` uses static demo data.
 - `prReviewer.config.providers.useDemoData=false` uses HTTP APIs and requires valid domains/credentials.
 - `prReviewer.config.providers.disableTlsValidation=true` disables HTTPS certificate validation in real-provider mode (use only in trusted internal environments).
-- Credential `*Ref` values are resolved from environment variables in current implementation.
+- `tokenRef` is treated as a direct token value in current implementation (no environment variable lookup).
 - For real environments, credentials should be stored in VS Code SecretStorage; direct credential fields are best for local/debug usage only.
 
 ## Troubleshooting
