@@ -173,7 +173,7 @@
   "icon": "media/extension-icon.png",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "node --test --loader ts-node/esm tests/**/*.test.ts"
+    "test": "node --test --loader ts-node/esm"
   },
   "devDependencies": {
     "@types/node": "^22.13.4",
