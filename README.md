@@ -167,7 +167,8 @@ npm test
 ### 1. Prerequisites
 
 - VS Code `>= 1.96.0`
-- Node.js `>= 20` (recommended)
+- Node.js `20.11.1`
+- npm `10.2.4`
 - For `llm.mode=copilot`: active GitHub Copilot in VS Code
 - For packaging: `@vscode/vsce`
 

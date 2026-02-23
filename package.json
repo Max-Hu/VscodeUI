@@ -4,8 +4,11 @@
   "private": true,
   "type": "module",
   "main": "./dist/src/extension/extension.js",
+  "packageManager": "npm@10.2.4",
   "engines": {
-    "vscode": "^1.96.0"
+    "vscode": "^1.96.0",
+    "node": "20.11.1",
+    "npm": "10.2.4"
   },
   "activationEvents": [
     "onView:prReviewer.panel",
