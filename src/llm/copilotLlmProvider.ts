@@ -151,7 +151,6 @@ function toCopilotModelCatalogItem(model: unknown, index: number): CopilotModelC
   const reasoningEffort = inferReasoningEffort(candidate);
   const labelParts = [
     toModelLabel(candidate),
-    version ? `v=${version}` : "",
     reasoningEffort ? `effort=${reasoningEffort}` : ""
   ].filter(Boolean);
   return {
