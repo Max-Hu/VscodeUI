@@ -108,7 +108,6 @@ It collects context from GitHub, Jira, and Confluence, asks VS Code Copilot to s
 - Scoring and evaluation are done by Copilot output.
 - Local rule-based scoring fallback is intentionally disabled.
 - `mock` mode is available for testing and local development.
-- You can use `prReviewer.config.llm.useMock` as a quick boolean switch (`true` -> `mock`, `false` -> `copilot`).
 - In `mock` mode, the extension uses a built-in `MockLlmProvider` and does not require Copilot chat models.
 
 ## Provider Runtime Behavior
@@ -291,7 +290,6 @@ All settings are under `prReviewer.config`.
 | `prReviewer.config.providers.confluence.credential.token` | Direct Confluence token (prefer `tokenRef`). | `""` |
 | `prReviewer.config.llm` | LLM runtime configuration container. | `{}` |
 | `prReviewer.config.llm.mode` | LLM execution mode for scoring/drafting (`copilot` or `mock`). | `copilot` |
-| `prReviewer.config.llm.useMock` | Quick boolean override for LLM mode. `true` forces `mock`, `false` forces `copilot`. | unset |
 | `prReviewer.config.post` | Publish behavior configuration container. | `{}` |
 | `prReviewer.config.post.enabled` | Enable/disable publishing comments back to PR. | `true` |
 | `prReviewer.config.post.requireConfirmation` | Require explicit confirmation before publish. | `true` |
@@ -337,8 +335,7 @@ Notes:
       }
     },
     "llm": {
-      "mode": "copilot",
-      "useMock": false
+      "mode": "copilot"
     },
     "post": {
       "enabled": true,
@@ -399,8 +396,8 @@ Current tests cover:
 ## Troubleshooting
 
 - Error: `LLM provider is required for score-pr...`
-  - Set `"prReviewer.config.llm.useMock": true` to force built-in mock LLM, or
-  - Set `"prReviewer.config.llm.useMock": false` (or `"prReviewer.config.llm.mode": "copilot"`) and ensure Copilot chat model is available.
+  - Set `"prReviewer.config.llm.mode": "mock"` to force built-in mock LLM, or
+  - Set `"prReviewer.config.llm.mode": "copilot"` and ensure Copilot chat model is available.
 - No logs in Output channel:
   - Open `View -> Output` in the Extension Development Host window and select channel `PR Reviewer`.
   - Ensure `"prReviewer.config.observability.enabled": true` if you want step-by-step pipeline events.

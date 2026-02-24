@@ -170,10 +170,6 @@
                   ],
                   "default": "copilot",
                   "description": "LLM execution mode."
-                },
-                "useMock": {
-                  "type": "boolean",
-                  "description": "Quick switch. true=mock, false=copilot. Overrides llm.mode when provided."
                 }
               }
             },

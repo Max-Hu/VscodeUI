@@ -85,6 +85,26 @@ export class PrReviewerPanelProvider implements vscode.WebviewViewProvider {
       disableTlsValidation,
       configPatch
     });
+    const selectedPanelModelId = options?.copilotModelId?.trim();
+    const panelSelectedMock = selectedPanelModelId === "mock";
+    const panelSelectedCopilot = Boolean(selectedPanelModelId && !panelSelectedMock);
+    if (panelSelectedMock) {
+      configPatch = {
+        ...configPatch,
+        llm: {
+          ...(configPatch.llm ?? {}),
+          mode: "mock"
+        }
+      };
+    } else if (panelSelectedCopilot) {
+      configPatch = {
+        ...configPatch,
+        llm: {
+          ...(configPatch.llm ?? {}),
+          mode: "copilot"
+        }
+      };
+    }
     const llmMode = configPatch.llm?.mode ?? "copilot";
     const observabilityEnabled = configPatch.observability?.enabled ?? true;
     const verboseLogs = configPatch.observability?.verboseLogs ?? false;
@@ -98,11 +118,13 @@ export class PrReviewerPanelProvider implements vscode.WebviewViewProvider {
       this.outputChannel.appendLine(`[config] effective config patch: ${safeStringify(configPatch)}`);
     }
     const llmProvider =
-      llmMode === "copilot" && options?.copilotModelId
-        ? new CopilotLlmProvider({ preferredModelId: options.copilotModelId })
+      panelSelectedCopilot
+        ? new CopilotLlmProvider({ preferredModelId: selectedPanelModelId })
         : undefined;
-    if (llmProvider) {
-      this.outputChannel.appendLine(`[config] selected copilot model id=${options?.copilotModelId}`);
+    if (panelSelectedMock) {
+      this.outputChannel.appendLine("[config] panel model selection=mock (overrides VS Code LLM mode for this review)");
+    } else if (llmProvider) {
+      this.outputChannel.appendLine(`[config] selected copilot model id=${selectedPanelModelId}`);
     }
 
     const reviewObserver = new PanelReviewObserver({

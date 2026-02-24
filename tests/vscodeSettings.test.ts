@@ -80,11 +80,10 @@ test("buildStage1ConfigPatchFromStructuredSettings maps structured providers and
   });
 });
 
-test("buildStage1ConfigPatchFromStructuredSettings maps llm.useMock and overrides llm.mode", () => {
+test("buildStage1ConfigPatchFromStructuredSettings reads llm.mode only", () => {
   const patch = buildStage1ConfigPatchFromStructuredSettings({
     llm: {
-      mode: "copilot",
-      useMock: true
+      mode: "mock"
     }
   });
 

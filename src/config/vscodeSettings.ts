@@ -180,8 +180,7 @@ function readLlmSettings(value: unknown): Stage1ConfigPatch["llm"] | undefined {
     return undefined;
   }
 
-  const useMock = asBoolean(llm.useMock);
-  const mode = typeof useMock === "boolean" ? (useMock ? "mock" : "copilot") : asLlmMode(llm.mode);
+  const mode = asLlmMode(llm.mode);
   if (!mode) {
     return undefined;
   }
