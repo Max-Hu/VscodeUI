@@ -9,6 +9,13 @@ export interface StartReviewMessage {
   };
 }
 
+export interface LoadPrDiffFilesMessage {
+  type: "load-pr-diff-files";
+  payload: {
+    prLink: string;
+  };
+}
+
 export interface ListCopilotModelsMessage {
   type: "list-copilot-models";
   payload?: Record<string, never>;
@@ -59,6 +66,35 @@ export interface ReviewProgressMessage {
   };
 }
 
+export interface PrDiffOpenedMessage {
+  type: "pr-diff-opened";
+  payload: {
+    totalFiles: number;
+    requestedFiles: number;
+    openedFiles: number;
+    skippedFiles: number;
+  };
+}
+
+export interface PrDiffFilesLoadedMessage {
+  type: "pr-diff-files-loaded";
+  payload: {
+    prLink: string;
+    prTitle: string;
+    source: "demo" | "real";
+    totalFiles: number;
+    selectableFiles: number;
+    unsupportedFiles: number;
+  };
+}
+
+export interface PrDiffFailedMessage {
+  type: "pr-diff-failed";
+  payload: {
+    message: string;
+  };
+}
+
 export interface CopilotModelsMessage {
   type: "copilot-models";
   payload: {
@@ -67,10 +103,17 @@ export interface CopilotModelsMessage {
   };
 }
 
-export type PanelInboundMessage = StartReviewMessage | PublishReviewMessage | ListCopilotModelsMessage;
+export type PanelInboundMessage =
+  | StartReviewMessage
+  | PublishReviewMessage
+  | ListCopilotModelsMessage
+  | LoadPrDiffFilesMessage;
 export type PanelOutboundMessage =
   | ReviewCompletedMessage
   | PublishCompletedMessage
   | ReviewFailedMessage
   | ReviewProgressMessage
+  | PrDiffFilesLoadedMessage
+  | PrDiffOpenedMessage
+  | PrDiffFailedMessage
   | CopilotModelsMessage;

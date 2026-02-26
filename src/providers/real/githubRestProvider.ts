@@ -5,6 +5,20 @@ import { HttpJsonClient } from "./httpJsonClient.js";
 
 const GITHUB_ACCEPT = "application/vnd.github+json";
 
+export interface GithubPrDiffFile {
+  path: string;
+  status: "added" | "removed" | "modified" | "renamed" | "copied" | "changed" | "unknown";
+  previousPath?: string;
+  patch?: string;
+}
+
+export interface GithubPrDiffSnapshot {
+  prTitle: string;
+  baseSha: string;
+  headSha: string;
+  files: GithubPrDiffFile[];
+}
+
 export class GithubRestProvider implements IGithubProvider {
   private readonly client: HttpJsonClient;
 
@@ -91,6 +105,62 @@ export class GithubRestProvider implements IGithubProvider {
     };
   }
 
+  async getPullRequestDiffSnapshot(reference: PrReference): Promise<GithubPrDiffSnapshot> {
+    const basePath = `/repos/${reference.owner}/${reference.repo}`;
+    const pull = await this.client.requestJson<any>(`${basePath}/pulls/${reference.prNumber}`);
+    const files = await this.fetchPagedArray<any>(`${basePath}/pulls/${reference.prNumber}/files`);
+
+    const baseSha = asString(pull?.base?.sha);
+    const headSha = asString(pull?.head?.sha);
+    if (!baseSha || !headSha) {
+      throw new Error("GitHub PR diff is missing base/head commit SHA.");
+    }
+
+    return {
+      prTitle: asString(pull?.title, `PR #${reference.prNumber}`),
+      baseSha,
+      headSha,
+      files: files.map((file) => ({
+        path: asString(file?.filename, "unknown"),
+        status: normalizePrFileStatus(file?.status),
+        previousPath: asString(file?.previous_filename) || undefined,
+        patch: asString(file?.patch) || undefined
+      }))
+    };
+  }
+
+  async getTextFileContentAtRef(reference: PrReference, path: string, ref: string): Promise<string | undefined> {
+    const normalizedPath = path.trim();
+    const normalizedRef = ref.trim();
+    if (!normalizedPath || !normalizedRef) {
+      return undefined;
+    }
+    const endpoint = `/repos/${reference.owner}/${reference.repo}/contents/${encodeGitHubPath(normalizedPath)}`;
+    try {
+      const response = await this.client.requestJson<any>(endpoint, {
+        query: {
+          ref: normalizedRef
+        }
+      });
+      const encodedContent = asString(response?.content);
+      const encoding = asString(response?.encoding).toLowerCase();
+      if (!encodedContent || encoding !== "base64") {
+        return undefined;
+      }
+      const decoded = Buffer.from(encodedContent.replace(/\s+/g, ""), "base64").toString("utf8");
+      if (looksBinary(decoded)) {
+        return undefined;
+      }
+      return decoded;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      if (/\brequest failed: 404\b/i.test(message)) {
+        return undefined;
+      }
+      throw error;
+    }
+  }
+
   private async fetchPagedArray<T>(path: string): Promise<T[]> {
     const result: T[] = [];
     const perPage = 100;
@@ -112,6 +182,47 @@ export class GithubRestProvider implements IGithubProvider {
     }
     return result;
   }
+}
+
+function normalizePrFileStatus(value: unknown): GithubPrDiffFile["status"] {
+  if (
+    value === "added" ||
+    value === "removed" ||
+    value === "modified" ||
+    value === "renamed" ||
+    value === "copied" ||
+    value === "changed"
+  ) {
+    return value;
+  }
+  return "unknown";
+}
+
+function encodeGitHubPath(path: string): string {
+  return path
+    .split("/")
+    .filter((segment) => segment.length > 0)
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+}
+
+function looksBinary(text: string): boolean {
+  if (!text) {
+    return false;
+  }
+  if (text.includes("\u0000")) {
+    return true;
+  }
+  let suspicious = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    const code = text.charCodeAt(i);
+    const isAllowedControl = code === 9 || code === 10 || code === 13;
+    const isPrintable = code >= 32 && code !== 127;
+    if (!isAllowedControl && !isPrintable) {
+      suspicious += 1;
+    }
+  }
+  return suspicious / Math.max(1, text.length) > 0.15;
 }
 
 function normalizeGithubApiBase(domain: string): string {

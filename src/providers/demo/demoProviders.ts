@@ -5,6 +5,7 @@ import type {
   PrReference,
   PublishedComment
 } from "../../domain/types.js";
+import type { GithubPrDiffSnapshot } from "../real/githubRestProvider.js";
 import type { IConfluenceProvider } from "../confluenceProvider.js";
 import type { IGithubProvider } from "../githubProvider.js";
 import type { IJiraProvider } from "../jiraProvider.js";
@@ -87,6 +88,31 @@ export class DemoGithubProvider implements IGithubProvider {
     this.published.push(comment);
     return comment;
   }
+
+  async getPullRequestDiffSnapshot(reference: PrReference): Promise<GithubPrDiffSnapshot> {
+    const pr = await this.getPullRequest(reference);
+    return {
+      prTitle: pr.metadata.title,
+      baseSha: `demo-base-${reference.prNumber}`,
+      headSha: `demo-head-${reference.prNumber}`,
+      files: pr.files.map((file) => ({
+        path: file.path,
+        status: inferDemoDiffStatus(file.patch),
+        patch: file.patch || undefined
+      }))
+    };
+  }
+
+  async getTextFileContentAtRef(reference: PrReference, path: string, ref: string): Promise<string | undefined> {
+    const pr = await this.getPullRequest(reference);
+    const target = pr.files.find((file) => file.path === path);
+    if (!target) {
+      return undefined;
+    }
+
+    const side = isDemoHeadRef(ref, reference.prNumber) ? "head" : "base";
+    return renderDemoFileContentFromPatch(target.path, target.patch, side);
+  }
 }
 
 export class DemoJiraProvider implements IJiraProvider {
@@ -159,4 +185,77 @@ function jiraKeyToConfluenceUrl(key: string): string {
 
 function slug(input: string): string {
   return input.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+}
+
+function inferDemoDiffStatus(patch: string): "added" | "removed" | "modified" {
+  const lines = patch.split(/\r?\n/);
+  let hasAdded = false;
+  let hasRemoved = false;
+
+  for (const line of lines) {
+    if (line.startsWith("+++ ") || line.startsWith("--- ") || line.startsWith("@@")) {
+      continue;
+    }
+    if (line.startsWith("+")) {
+      hasAdded = true;
+    } else if (line.startsWith("-")) {
+      hasRemoved = true;
+    }
+  }
+
+  if (hasAdded && !hasRemoved) {
+    return "added";
+  }
+  if (!hasAdded && hasRemoved) {
+    return "removed";
+  }
+  return "modified";
+}
+
+function isDemoHeadRef(ref: string, prNumber: number): boolean {
+  return ref.trim() === `demo-head-${prNumber}`;
+}
+
+function renderDemoFileContentFromPatch(path: string, patch: string, side: "base" | "head"): string {
+  if (!patch.trim()) {
+    return side === "head" ? `// Demo patch unavailable for ${path}\n` : "";
+  }
+
+  const output: string[] = [];
+  for (const rawLine of patch.split(/\r?\n/)) {
+    if (rawLine.startsWith("diff --git ") || rawLine.startsWith("index ") || rawLine.startsWith("@@")) {
+      continue;
+    }
+    if (rawLine.startsWith("\\ No newline at end of file")) {
+      continue;
+    }
+    if (rawLine.startsWith("+++ ") || rawLine.startsWith("--- ")) {
+      continue;
+    }
+
+    if (rawLine.startsWith("+")) {
+      if (side === "head") {
+        output.push(rawLine.slice(1));
+      }
+      continue;
+    }
+    if (rawLine.startsWith("-")) {
+      if (side === "base") {
+        output.push(rawLine.slice(1));
+      }
+      continue;
+    }
+    if (rawLine.startsWith(" ")) {
+      output.push(rawLine.slice(1));
+      continue;
+    }
+
+    output.push(rawLine);
+  }
+
+  if (output.length > 0) {
+    return `${output.join("\n")}\n`;
+  }
+
+  return side === "head" ? `// Demo generated content for ${path}\n` : "";
 }

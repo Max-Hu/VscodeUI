@@ -12,6 +12,7 @@
   },
   "activationEvents": [
     "onView:prReviewer.panel",
+    "onView:prReviewer.diffFiles",
     "onCommand:prReviewer.openPanel"
   ],
   "contributes": {
@@ -30,6 +31,10 @@
           "id": "prReviewer.panel",
           "name": "PR Reviewer",
           "type": "webview"
+        },
+        {
+          "id": "prReviewer.diffFiles",
+          "name": "PR Diff Files"
         }
       ]
     },

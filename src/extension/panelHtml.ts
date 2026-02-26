@@ -313,6 +313,7 @@ export function getPanelHtml(nonce: string): string {
     <label for="prLink">PR Link</label>
     <input id="prLink" type="text" placeholder="https://github.com/{owner}/{repo}/pull/{number}" />
     <div class="row">
+      <button id="diffBtn" type="button">Load PR Files To Tree</button>
       <button id="reviewBtn" class="primary">Run Review</button>
     </div>
   </div>
@@ -359,6 +360,7 @@ export function getPanelHtml(nonce: string): string {
       refreshModelsBtn: document.getElementById("refreshModelsBtn"),
       modelStatus: document.getElementById("modelStatus"),
       draft: document.getElementById("draft"),
+      diffBtn: document.getElementById("diffBtn"),
       reviewBtn: document.getElementById("reviewBtn"),
       publishBtn: document.getElementById("publishBtn"),
       progress: document.getElementById("progress"),
@@ -551,6 +553,19 @@ export function getPanelHtml(nonce: string): string {
       });
     }
 
+    function loadPrDiffFiles() {
+      const prLink = (els.prLink.value || "").trim();
+      state.prLink = prLink;
+      appendProgress("Loading PR changed files into tree...", "info");
+      setStatus("Loading PR files into tree...", "");
+      vscode.postMessage({
+        type: "load-pr-diff-files",
+        payload: {
+          prLink
+        }
+      });
+    }
+
     function publish() {
       if (!state.prLink) {
         appendProgress("Run review first.", "error");
@@ -584,6 +599,7 @@ export function getPanelHtml(nonce: string): string {
       });
     }
 
+    els.diffBtn.addEventListener("click", loadPrDiffFiles);
     els.reviewBtn.addEventListener("click", runReview);
     els.publishBtn.addEventListener("click", publish);
     els.refreshModelsBtn.addEventListener("click", requestCopilotModels);
@@ -620,6 +636,39 @@ export function getPanelHtml(nonce: string): string {
       } else if (message.type === "review-failed") {
         setPublishEnabled(false);
         const errorMessage = message.payload?.message || "Request failed.";
+        appendProgress(errorMessage, "error");
+        setStatus(errorMessage, "error");
+      } else if (message.type === "pr-diff-opened") {
+        const requestedFiles = Number(message.payload?.requestedFiles || 0);
+        const openedFiles = Number(message.payload?.openedFiles || 0);
+        const totalFiles = Number(message.payload?.totalFiles || 0);
+        const skippedFiles = Number(message.payload?.skippedFiles || 0);
+        const summary =
+          "Opened " +
+          String(openedFiles) +
+          " diff(s)" +
+          (requestedFiles > 0 ? " from " + String(requestedFiles) + " requested file(s)" : "") +
+          (totalFiles > 0 ? " | total changed=" + String(totalFiles) : "") +
+          (skippedFiles > 0 ? " | skipped " + String(skippedFiles) : "");
+        appendProgress(summary, "success");
+        setStatus(summary, "ok");
+      } else if (message.type === "pr-diff-files-loaded") {
+        const totalFiles = Number(message.payload?.totalFiles || 0);
+        const selectableFiles = Number(message.payload?.selectableFiles || 0);
+        const unsupportedFiles = Number(message.payload?.unsupportedFiles || 0);
+        const source = message.payload?.source ? " | source " + String(message.payload.source) : "";
+        const summary =
+          "Loaded PR files: " +
+          String(totalFiles) +
+          " | openable " +
+          String(selectableFiles) +
+          (unsupportedFiles > 0 ? " | unsupported " + String(unsupportedFiles) : "") +
+          source +
+          " | use 'PR Diff Files' tree to open diffs";
+        appendProgress(summary, "info");
+        setStatus(summary, "ok");
+      } else if (message.type === "pr-diff-failed") {
+        const errorMessage = message.payload?.message || "PR diff failed.";
         appendProgress(errorMessage, "error");
         setStatus(errorMessage, "error");
       } else if (message.type === "copilot-models") {
